@@ -1,0 +1,12 @@
+{
+  "appId": "www.fydox.in",
+  "appName": "SwitchKart",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "never"
+  }
+
+}
