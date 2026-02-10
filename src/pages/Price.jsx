@@ -15,21 +15,22 @@ import toast from "react-hot-toast";
 const pink = "bg-primary";
 const fileUploader = async (authToken, file, fileName, fileType) => {
   try {
-    const resURL = await axios.get(`${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/s3/get-presigned-url`,
+    const resURL = await axios.get(
+      `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/s3/get-presigned-url`,
       {
         params: {
           fileName: fileName,
           fileType: fileType,
         },
-        headers: { Authorization: authToken }
-      }
+        headers: { Authorization: authToken },
+      },
     );
     if (resURL?.data?.url) {
       const presignedUrl = resURL.data.url;
       const result = await axios.put(presignedUrl, file, {
         headers: {
-          'Content-Type': fileType
-        }
+          "Content-Type": fileType,
+        },
       });
       console.log("File uploaded successfully:", result);
     }
@@ -39,8 +40,14 @@ const fileUploader = async (authToken, file, fileName, fileType) => {
   }
 };
 const Price = () => {
-  const leadsubmitDATA = JSON.parse(sessionStorage.getItem("responsedatadata"));
-  const savedOtpData = JSON.parse(localStorage.getItem("otpData"));
+  const leadsubmitRaw = sessionStorage.getItem("responsedatadata");
+  const leadsubmitDATA =
+    leadsubmitRaw && leadsubmitRaw !== "undefined"
+      ? JSON.parse(leadsubmitRaw)
+      : null;
+  const otpDataRaw = localStorage.getItem("otpData");
+  const savedOtpData =
+    otpDataRaw && otpDataRaw !== "undefined" ? JSON.parse(otpDataRaw) : null;
   const token = sessionStorage.getItem("authToken");
   const [file, setFile] = useState(null);
   const [idProofBack, setIdProofBack] = useState(null);
@@ -66,10 +73,18 @@ const Price = () => {
   const phoneBottomRef = useRef(null);
   const [isBillRequired, setIsBillRequired] = useState(false);
   const Device = sessionStorage.getItem("DeviceType");
-  const categories = JSON.parse(sessionStorage.getItem("Categories"));
+  const categoriesRaw = sessionStorage.getItem("Categories");
+  const categories =
+    categoriesRaw && categoriesRaw !== "undefined"
+      ? JSON.parse(categoriesRaw)
+      : [];
   const prod = categories.filter((elem) => elem.categoryCode === Device);
   useEffect(() => {
-    const billData = JSON.parse(sessionStorage.getItem("billData"));
+    const billDataRaw = sessionStorage.getItem("billData");
+    const billData =
+      billDataRaw && billDataRaw !== "undefined"
+        ? JSON.parse(billDataRaw)
+        : null;
     if (billData && billData?.selected[0] === false) {
       setIsBillRequired(true);
     }
@@ -91,25 +106,81 @@ const Price = () => {
       setIsLoading(false);
       return;
     }
-    if (!imeinumber || !aadharNumber || !phoneFront || !phoneBack || !phoneLeft ||
-      !phoneRight || !phoneTop || !phoneBottom || (isBillRequired && !phoneBill)
+    if (
+      !imeinumber ||
+      !aadharNumber ||
+      !phoneFront ||
+      !phoneBack ||
+      !phoneLeft ||
+      !phoneRight ||
+      !phoneTop ||
+      !phoneBottom ||
+      (isBillRequired && !phoneBill)
     ) {
-      alert("Please fill in all mandatory fields (IMEI/Serial number and device images).");
+      alert(
+        "Please fill in all mandatory fields (IMEI/Serial number and device images).",
+      );
       setIsLoading(false);
       return;
     }
     try {
       await fileUploader(token, file, imeinumber + "-adhaarFront", file.type);
-      await fileUploader(token, file, imeinumber + "-adhaarFront", file.type);
-      await fileUploader(token, idProofBack, imeinumber + "-adhaarBack", idProofBack.type);
-      await fileUploader(token, phoneBill, imeinumber + "-phoneBill", phoneBill.type);
-      await fileUploader(token, phoneFront, imeinumber + "-phoneFront", phoneFront.type);
-      await fileUploader(token, phoneBack, imeinumber + "-phoneBack", phoneBack.type);
-      await fileUploader(token, phoneTop, imeinumber + "-phoneTop", phoneTop.type);
-      await fileUploader(token, phoneLeft, imeinumber + "-phoneLeft", phoneLeft.type);
-      await fileUploader(token, phoneRight, imeinumber + "-phoneRight", phoneRight.type);
-      await fileUploader(token, phoneBottom, imeinumber + "-phoneBottom", phoneBottom.type);
-      await fileUploader(token, phoneBottom, imeinumber + "-signature", phoneBottom.type);
+      await fileUploader(
+        token,
+        idProofBack,
+        imeinumber + "-adhaarBack",
+        idProofBack.type,
+      );
+      if (phoneBill) {
+        await fileUploader(
+          token,
+          phoneBill,
+          imeinumber + "-phoneBill",
+          phoneBill.type,
+        );
+      }
+      await fileUploader(
+        token,
+        phoneFront,
+        imeinumber + "-phoneFront",
+        phoneFront.type,
+      );
+      await fileUploader(
+        token,
+        phoneBack,
+        imeinumber + "-phoneBack",
+        phoneBack.type,
+      );
+      await fileUploader(
+        token,
+        phoneTop,
+        imeinumber + "-phoneTop",
+        phoneTop.type,
+      );
+      await fileUploader(
+        token,
+        phoneLeft,
+        imeinumber + "-phoneLeft",
+        phoneLeft.type,
+      );
+      await fileUploader(
+        token,
+        phoneRight,
+        imeinumber + "-phoneRight",
+        phoneRight.type,
+      );
+      await fileUploader(
+        token,
+        phoneBottom,
+        imeinumber + "-phoneBottom",
+        phoneBottom.type,
+      );
+      await fileUploader(
+        token,
+        phoneBottom,
+        imeinumber + "-signature",
+        phoneBottom.type,
+      );
     } catch (error) {
       setIsLoading(false);
     }
@@ -121,9 +192,10 @@ const Price = () => {
     formData.append("phoneNumber", savedOtpData?.phone);
     formData.append("aadharNumber", aadharNumber);
     try {
-      await axios.post(`${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/questionnaires/upload-documents`,
+      await axios.post(
+        `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/questionnaires/upload-documents`,
         formData,
-        { headers: { Authorization: token } }
+        { headers: { Authorization: token } },
       );
       setIsLoading(false);
       navigate("/specialoffers");
@@ -202,16 +274,17 @@ const Price = () => {
       <div className="fixed bottom-0 flex flex-col w-full gap-2 p-4 bg-white border-t-2 ">
         <div
           onClick={() => uploadAllImages()}
-          className={` relative text-center py-1 px-2 rounded-lg cursor-pointer flex justify-between text-white items-center ${!imeinumber ||
+          className={` relative text-center py-1 px-2 rounded-lg cursor-pointer flex justify-between text-white items-center ${
+            !imeinumber ||
             !phoneFront ||
             !phoneBack ||
             !phoneLeft ||
             !phoneRight ||
             !phoneTop ||
             !phoneBottom
-            ? "cursor-not-allowed bg-gray-400"
-            : pink
-            }`}
+              ? "cursor-not-allowed bg-gray-400"
+              : pink
+          }`}
         >
           {isLoading && (
             <CgSpinner
@@ -247,9 +320,12 @@ const ImeiField = ({ imeinumber, setImeiNumber, prod }) => {
     const value = e.target.value;
     setImeiNumber(value);
     validateImeiNumber(value);
-    const dataModel = JSON.parse(sessionStorage.getItem("dataModel"));
-    dataModel.imei = value;
-    sessionStorage.setItem("dataModel", JSON.stringify(dataModel));
+    const dataModelRaw = sessionStorage.getItem("dataModel");
+    if (dataModelRaw && dataModelRaw !== "undefined") {
+      const dataModel = JSON.parse(dataModelRaw);
+      dataModel.imei = value;
+      sessionStorage.setItem("dataModel", JSON.stringify(dataModel));
+    }
   };
 
   const handleVerify = () => {
@@ -279,8 +355,9 @@ const ImeiField = ({ imeinumber, setImeiNumber, prod }) => {
           maxLength={15}
         />
         <button
-          className={`px-4 py-2 font-bold text-white rounded ${!error ? pink : "bg-gray-400 cursor-not-allowed"
-            }`}
+          className={`px-4 py-2 font-bold text-white rounded ${
+            !error ? pink : "bg-gray-400 cursor-not-allowed"
+          }`}
           onClick={handleVerify}
           disabled={!!error}
         >
@@ -339,8 +416,9 @@ const AadharNumberField = ({ aadharNumber, setAadharNumber }) => {
           maxLength={12}
         />
         <button
-          className={`px-4 py-2 font-bold text-white rounded ${!error ? pink : "bg-gray-400 cursor-not-allowed"
-            }`}
+          className={`px-4 py-2 font-bold text-white rounded ${
+            !error ? pink : "bg-gray-400 cursor-not-allowed"
+          }`}
           onClick={handleVerify}
           disabled={!!error}
         >
@@ -428,7 +506,7 @@ const PhoneBill = ({
   phoneBillRef,
   phoneBill,
   isBillRequired,
-  prod
+  prod,
 }) => {
   return (
     <div className="flex flex-col adharcard mt-[10px]">
@@ -655,9 +733,7 @@ const PhonePhotos1 = ({
           </button>
         </div>
       </div>
-      {showHoldModal && (
-        <MobileMoldModel setShowHoldModal={setShowHoldModal} />
-      )}
+      {showHoldModal && <MobileMoldModel setShowHoldModal={setShowHoldModal} />}
     </div>
   );
 };
@@ -713,7 +789,7 @@ const MobileMoldModel = ({ setShowHoldModal }) => {
   );
 };
 
-const PriceHeader = (navigate) => {
+const PriceHeader = ({ navigate }) => {
   const userName = "";
   return (
     <div className="flex items-center w-[99%] h-16 py-4 bg-white border-b-2 HEADER header">
@@ -723,9 +799,7 @@ const PriceHeader = (navigate) => {
             onClick={() => navigate(-1)}
             className="text-xs ml-2 flex items-center justify-center text-white bg-[--primary-color] hover:cursor-pointer p-2 rounded-full"
           >
-            <IoArrowBack
-              size={24}
-            />
+            <IoArrowBack size={24} />
           </button>
           <img
             onClick={() => navigate("/selectdevicetype")}
@@ -738,8 +812,8 @@ const PriceHeader = (navigate) => {
         <img className="w-[30px]" src={User_Logo} alt="" />
       </div>
     </div>
-  )
-}
+  );
+};
 const WatchMoldModel = ({ setShowHoldModal }) => {
   return (
     <div className="fixed top-0 left-0 z-50 flex items-center justify-center w-full h-full bg-black bg-opacity-50">
