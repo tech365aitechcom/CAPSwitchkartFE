@@ -58,52 +58,52 @@ export const DeviceTypeFilter = ({
   setSelectedBtn,
   setDeviceType,
 }) => {
-    const token = sessionStorage.getItem("authToken");
+  const token = sessionStorage.getItem("authToken");
 
   const [categories, setCategories] = useState([]);
 
-  const staticCategories = [
-    { name: "More", image: null },
-  ];
+  const staticCategories = [{ name: "More", image: null }];
   useEffect(() => {
     getCategories();
   }, []);
-const getCategories = async () => {
-  try {
-    const { data } = await axios.get(
-      `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/category/getAll`,
-      {
-        headers: { Authorization: token },
-      }
-    );
-    sessionStorage.setItem("Categories", JSON.stringify(data?.data));
-    // Map API data and merge with static data
-    const mergedCategories = data.data.map((apiCat) => {
-      // Find a matching category in static categories
-      const match = staticCategories.find(
-        (staticCat) => staticCat.apiType === apiCat.categoryName
+  const getCategories = async () => {
+    try {
+      const { data } = await axios.get(
+        `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/category/getAll`,
+        {
+          headers: { Authorization: token },
+        },
+      );
+      sessionStorage.setItem("Categories", JSON.stringify(data?.data));
+      // Map API data and merge with static data
+      const mergedCategories = data.data.map((apiCat) => {
+        // Find a matching category in static categories
+        const match = staticCategories.find(
+          (staticCat) => staticCat.apiType === apiCat.categoryName,
+        );
+
+        // Merge data if match found, otherwise keep API category
+        return {
+          ...apiCat,
+          image: match?.image || null, // Use the image from static data if available
+          apiType: apiCat.categoryCode, // Ensure `apiType` is consistent
+        };
+      });
+
+      // Append static categories that are not present in API data
+      const additionalCategories = staticCategories.filter(
+        (staticCat) =>
+          !data.data.some(
+            (apiCat) => apiCat.categoryName === staticCat.apiType,
+          ),
       );
 
-      // Merge data if match found, otherwise keep API category
-      return {
-        ...apiCat,
-        image: match?.image || null, // Use the image from static data if available
-        apiType: apiCat.categoryCode, // Ensure `apiType` is consistent
-      };
-    });
-
-    // Append static categories that are not present in API data
-    const additionalCategories = staticCategories.filter(
-      (staticCat) =>
-        !data.data.some((apiCat) => apiCat.categoryName === staticCat.apiType)
-    );
-
-    // Update state with the merged categories
-    setCategories([...mergedCategories, ...additionalCategories]);
-  } catch (err) {
-    console.log(err);
-  }
-};
+      // Update state with the merged categories
+      setCategories([...mergedCategories, ...additionalCategories]);
+    } catch (err) {
+      console.log(err);
+    }
+  };
   const categoryContainerRef = useRef(null);
 
   const scrollCategory = (direction) => {
@@ -148,7 +148,9 @@ const getCategories = async () => {
               setDeviceType(category.apiType);
             }}
           >
-            {category?.logo && <img src={category.logo} alt={category.categoryName} />}
+            {category?.logo && (
+              <img src={category.logo} alt={category.categoryName} />
+            )}
             <span>{category?.categoryName || category?.name}</span>
           </div>
         ))}
@@ -165,27 +167,46 @@ const getCategories = async () => {
 
 export const DeviceTypeFilter2 = () => {
   const categories = [
-    { name: "iPhone", image: mobile, apiType: "CTG1", link: "/selectdevice/653cbbeae2eb1f468a1dd7ea" },
-    { name: "Watch", image: appleWatch, apiType: "CTG2", link: "/selectdevice/653cbbeae2eb1f468a1dd7ea" }
+    {
+      name: "iPhone",
+      image: mobile,
+      apiType: "CTG1",
+      link: "/selectdevice/653cbbeae2eb1f468a1dd7ea",
+    },
+    {
+      name: "Watch",
+      image: appleWatch,
+      apiType: "CTG2",
+      link: "/selectdevice/653cbbeae2eb1f468a1dd7ea",
+    },
   ];
   const navigate = useNavigate();
   return (
     <div className={`px-3 w-full`}>
-      <div
-        className={`flex flex-shrink-0 gap-4`}
-      >
+      <div className={`flex flex-shrink-0 gap-4`}>
         {categories.map((category, index) => (
           <div
             key={index}
-            style={{ boxShadow: '1px 1px 2px 0px rgba(0, 0, 0, 0.158), -1px -1px 0px 0px rgba(0, 0, 0, 0.034)'}}
+            style={{
+              boxShadow:
+                "1px 1px 2px 0px rgba(0, 0, 0, 0.158), -1px -1px 0px 0px rgba(0, 0, 0, 0.034)",
+            }}
             className={`flex flex-col items-center gap-1 justify-between rounded-md py-4`}
             onClick={() => {
               sessionStorage.setItem("DeviceType", category.apiType);
               navigate(category.link);
             }}
           >
-            {category.image && <img className="w-[400px] h-[150px] object-contain" src={category.image} alt={category.name} />}
-            <div className="w-full text-center font-semibold text-base text-primary">{category.name}</div>
+            {category.image && (
+              <img
+                className="w-[400px] h-[150px] object-contain"
+                src={category.image}
+                alt={category.name}
+              />
+            )}
+            <div className="w-full text-center font-semibold text-base text-primary">
+              {category.name}
+            </div>
           </div>
         ))}
       </div>
@@ -327,7 +348,7 @@ export const BrandList = ({ deviceType }) => {
         }/api/brands/getBrands?deviceType=${deviceType}`,
         {
           headers: { authorization: `${userToken1}` },
-        }
+        },
       )
       .then((res) => {
         setBrandList(res.data.data);
@@ -346,23 +367,25 @@ export const BrandList = ({ deviceType }) => {
   };
 
   const handleBrandClick = (brandItem) => {
-    console.log("adasdasasfdafadf", deviceType);
+    // Check if the brand actually supports the selected device type
+    // This uses the data from your database instead of a hardcoded list
+    const isSupported =
+      brandItem.deviceTypes && brandItem.deviceTypes.includes(deviceType);
 
-    const allowedBrandsCTG1 = new Set([
-      "Apple", "OnePlus", "POCO", "Realme", "Xiaomi", "Samsung", "Vivo", "iQOO",
-      "Infinix", "Tecno", "Google", "Nothing", "Honor", "Motorola", "Nokia",
-      "OPPO", "Lenovo", "Huawei"
-    ]);
+    // flexible check: If brand has types, trust the DB.
+    // If you strictly want to block specific cases, add them, but generally:
+    if (isSupported || brandItem.deviceTypes?.length > 0) {
+      // OPTIONAL: If the current deviceType doesn't match the brand's type
+      // (e.g. user is on CTG1 tab but brand is CTG6 only), auto-switch it.
+      if (!brandItem.deviceTypes.includes(deviceType)) {
+        sessionStorage.setItem("DeviceType", brandItem.deviceTypes[0]);
+      }
 
-    const shouldNavigate =
-      (deviceType === "CTG1" && allowedBrandsCTG1.has(brandItem.name)) ||
-      ((deviceType === "CTG2" || deviceType === "CTG5") && brandItem.name === "Apple");
-
-    if (shouldNavigate) {
       const detail = { brand: brandItem, models: {}, _id: brandItem._id };
       sessionStorage.setItem("dataModel", JSON.stringify(detail));
       navigate(`/selectdevice/${detail.brand?._id}`);
     } else {
+      // Only show "Coming Soon" if the brand genuinely has no configured device types
       handleDeviceClick();
     }
   };
@@ -446,7 +469,7 @@ const searchDeviceAPI = async (val) => {
   let model = "";
   await axios
     .get(
-      `https://alpha.imeicheck.com/api/modelBrandName?imei=${val}&format=json`
+      `https://alpha.imeicheck.com/api/modelBrandName?imei=${val}&format=json`,
     )
     .then((response) => {
       console.log(response);
@@ -467,8 +490,8 @@ const searchPhoneAPI = async (Sdata, deviceType) => {
       `${
         import.meta.env.VITE_REACT_APP_ENDPOINT
       }/api/user/Dashboard/search/phones`,
-      { name: Sdata},
-      { headers: { authorization: `${userToken}` } }
+      { name: Sdata },
+      { headers: { authorization: `${userToken}` } },
     )
     .then((res) => {
       const updatedData = res.data.map((item) => ({
@@ -492,13 +515,13 @@ const fetchDataAPI = async (days, fromDateDup, toDateDup, deviceType) => {
       `${
         import.meta.env.VITE_REACT_APP_ENDPOINT
       }/api/user/Dashboard/order/saled?time=${days}&fromdate=${fromDateDup}&todate=${toDateDup}&datareq=${deviceType}`,
-      { headers: { authorization: `${userToken}` } }
+      { headers: { authorization: `${userToken}` } },
     );
     response1 = await axios.get(
       `${
         import.meta.env.VITE_REACT_APP_ENDPOINT
       }/api/leadSet/getCount?time=${days}&fromdate=${fromDateDup}&todate=${toDateDup}&datareq=${deviceType}`,
-      { headers: { authorization: `${userToken}` } }
+      { headers: { authorization: `${userToken}` } },
     );
   } catch (error) {
     console.error("Error fetching data: ", error);
@@ -552,7 +575,7 @@ const SelectDeviceType = () => {
     } else {
       setFromDate(date);
       const formattedDate = new Date(
-        date.getTime() - date.getTimezoneOffset() * 60000
+        date.getTime() - date.getTimezoneOffset() * 60000,
       )
         .toISOString()
         .split("T")[0];
@@ -566,7 +589,7 @@ const SelectDeviceType = () => {
     } else {
       setToDate(date);
       const formattedDate = new Date(
-        date.getTime() - date.getTimezoneOffset() * 60000
+        date.getTime() - date.getTimezoneOffset() * 60000,
       )
         .toISOString()
         .split("T")[0];
@@ -620,7 +643,7 @@ const SelectDeviceType = () => {
           `${
             import.meta.env.VITE_REACT_APP_ENDPOINT
           }/api/user/Dashboard/get/top/sellingModels?time=${days}&deviceType=${deviceType}`,
-          { headers: { authorization: `${token}` } }
+          { headers: { authorization: `${token}` } },
         );
         const updatedData = await response.data.map((item) => ({
           ...item,
@@ -708,7 +731,7 @@ const SearchBox = ({
           headers: {
             authorization: `${authToken}`,
           },
-        }
+        },
       );
     } catch (error) {
       console.error("Error adding phone view: ", error);
@@ -783,12 +806,14 @@ const SearchBox = ({
                   </div>
                 ))}
             </div>
-          ) }
+          )}
 
           {imei.length > 0 && sortedModels.length === 0 && (
             <div className="flex flex-col my-auto text-sm font-medium text-gray-500">
               <img className="w-[250px] mx-auto" src={searchImage} />
-              <div className="mt-[50%] font-bold text-4xl">No Product Found</div>
+              <div className="mt-[50%] font-bold text-4xl">
+                No Product Found
+              </div>
             </div>
           )}
 
@@ -833,7 +858,10 @@ const MiddlePart = ({
 }) => {
   const Device1 = sessionStorage.getItem("DeviceType");
   const [selectedBtn, setSelectedBtn] = useState(Device1 || "");
-  const WEBSITE_SHORT_NAME = currentDomain === buyback ? import.meta.env.VITE_BUYBACK_SHORT_NAME : import.meta.env.VITE_WEBSITE_SHORT_NAME;
+  const WEBSITE_SHORT_NAME =
+    currentDomain === buyback
+      ? import.meta.env.VITE_BUYBACK_SHORT_NAME
+      : import.meta.env.VITE_WEBSITE_SHORT_NAME;
 
   useEffect(() => {
     if (Device1) {
@@ -845,9 +873,7 @@ const MiddlePart = ({
       <div className={styles.des_lr_wrap}>
         <div className={styles.des_left_wrap}>
           <div className={styles.search_box_wrap} onClick={searchBoxSwitch}>
-            <div
-              className={`flex items-center p-2 mb-1 ${styles.search_box}`}
-            >
+            <div className={`flex items-center p-2 mb-1 ${styles.search_box}`}>
               <div className="flex items-center">
                 <CiSearch size={20} className="inline ml-1" />
               </div>
@@ -861,85 +887,91 @@ const MiddlePart = ({
               </div>
             </div>
           </div>
-          {currentDomain === buyback && <DeviceTypeFilter2/>}
-          {currentDomain !== buyback && <DeviceTypeFilter
-            selectedBtn={selectedBtn}
-            setSelectedBtn={setSelectedBtn}
-            setDeviceType={setDeviceType}
-          />}
+          {currentDomain === buyback && <DeviceTypeFilter2 />}
+          {currentDomain !== buyback && (
+            <DeviceTypeFilter
+              selectedBtn={selectedBtn}
+              setSelectedBtn={setSelectedBtn}
+              setDeviceType={setDeviceType}
+            />
+          )}
           {currentDomain !== buyback && <BrandList deviceType={deviceType} />}
-          {currentDomain !== buyback && <div className={`ml-3 ${styles.date_filter}`}>
-            <select
-              name=""
-              id=""
-              onChange={(e) => {
-                handlepick(e);
-              }}
-              className="p-2 border-2 rounded-lg shadow-md outline-none bg-primary text-white"
-              // style={{ backgroundColor: "var(--primary-color)71", color: "white" }}
-            >
-              <option
-                value="today"
-                style={{ backgroundColor: "white", color: "black" }}
+          {currentDomain !== buyback && (
+            <div className={`ml-3 ${styles.date_filter}`}>
+              <select
+                name=""
+                id=""
+                onChange={(e) => {
+                  handlepick(e);
+                }}
+                className="p-2 border-2 rounded-lg shadow-md outline-none bg-primary text-white"
+                // style={{ backgroundColor: "var(--primary-color)71", color: "white" }}
               >
-                Today
-              </option>
-              <option
-                value="yesterday"
-                style={{ backgroundColor: "white", color: "black" }}
-              >
-                Yesterday
-              </option>
-              <option
-                value="7days"
-                style={{ backgroundColor: "white", color: "black" }}
-              >
-                7 Days
-              </option>
-              <option
-                value="thismonth"
-                style={{ backgroundColor: "white", color: "black" }}
-              >
-                This Month
-              </option>
-              <option
-                value="lastmonth"
-                style={{ backgroundColor: "white", color: "black" }}
-              >
-                Last Month
-              </option>
-              <option
-                value="Custom"
-                style={{ backgroundColor: "white", color: "black" }}
-              >
-                Custom
-              </option>
-            </select>
-          </div>}
+                <option
+                  value="today"
+                  style={{ backgroundColor: "white", color: "black" }}
+                >
+                  Today
+                </option>
+                <option
+                  value="yesterday"
+                  style={{ backgroundColor: "white", color: "black" }}
+                >
+                  Yesterday
+                </option>
+                <option
+                  value="7days"
+                  style={{ backgroundColor: "white", color: "black" }}
+                >
+                  7 Days
+                </option>
+                <option
+                  value="thismonth"
+                  style={{ backgroundColor: "white", color: "black" }}
+                >
+                  This Month
+                </option>
+                <option
+                  value="lastmonth"
+                  style={{ backgroundColor: "white", color: "black" }}
+                >
+                  Last Month
+                </option>
+                <option
+                  value="Custom"
+                  style={{ backgroundColor: "white", color: "black" }}
+                >
+                  Custom
+                </option>
+              </select>
+            </div>
+          )}
 
-          {currentDomain !== buyback && <div className={`flex gap-2 justify-between ${styles.info_wrap}`}>
-            <Link className="w-[33%]" to={`/orderscreated/${days}`}>
-              <OrderStatusBox
-                figures={orderCount}
-                title="Order Created"
-                background="rgb(2, 117, 242)"
-              />
-            </Link>
-            <Link className="w-[33%]" to={`/orderscompleted/${days}`}>
-              <OrderStatusBox
-                figures={orderSaled}
-                title="Order Completed"
-                background="#E94A4E"
-              />
-            </Link>
-            <Link className="w-[33%]" to={`/quotescreated/${days}`}>
-              <OrderStatusBox
-                figures={quoteCount}
-                title="Quotes Created"
-                background="#FF963E"
-              />
-            </Link>
-          </div>}
+          {currentDomain !== buyback && (
+            <div className={`flex gap-2 justify-between ${styles.info_wrap}`}>
+              <Link className="w-[33%]" to={`/orderscreated/${days}`}>
+                <OrderStatusBox
+                  figures={orderCount}
+                  title="Order Created"
+                  background="rgb(2, 117, 242)"
+                />
+              </Link>
+              <Link className="w-[33%]" to={`/orderscompleted/${days}`}>
+                <OrderStatusBox
+                  figures={orderSaled}
+                  title="Order Completed"
+                  background="#E94A4E"
+                />
+              </Link>
+              <Link className="w-[33%]" to={`/quotescreated/${days}`}>
+                <OrderStatusBox
+                  figures={quoteCount}
+                  title="Quotes Created"
+                  background="#FF963E"
+                />
+              </Link>
+            </div>
+          )}
           <p
             className={`${styles.topSell_head} text-lg font-bold text-primary`}
           >
@@ -960,7 +992,9 @@ const MiddlePart = ({
       >
         How {WEBSITE_SHORT_NAME} Works?
       </p>
-      <div className={`flex gap-2 mt-4 mb-[px] pb-[80px] justify-between mx-2 ${styles.info_wrap}`}>
+      <div
+        className={`flex gap-2 mt-4 mb-[px] pb-[80px] justify-between mx-2 ${styles.info_wrap}`}
+      >
         <div className="flex flex-col min-w-[30%]  items-center  ">
           <img className={`w-[50px] mb-2`} src={how1} />
           <p className="-mb-1 text-base font-bold">Add</p>

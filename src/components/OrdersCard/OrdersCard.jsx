@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { useNavigate } from "react-router-dom";
-import { setLeadOTPData, setResponseData } from "../../store/slices/responseSlice";
+import {
+  setLeadOTPData,
+  setResponseData,
+} from "../../store/slices/responseSlice";
 import { useDispatch } from "react-redux";
 import watch from "../../assets/apple_watch.png";
 import { setOtpVerified } from "../../store/slices/otpSlice";
@@ -10,9 +13,9 @@ import ReactDOMServer from "react-dom/server";
 import html2pdf from "html2pdf.js";
 import { FaDownload } from "react-icons/fa6";
 import { Capacitor } from "@capacitor/core";
-import { Share } from '@capacitor/share';
-import { Filesystem, Directory } from '@capacitor/filesystem';
-import { FileOpener } from '@awesome-cordova-plugins/file-opener';
+import { Share } from "@capacitor/share";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { FileOpener } from "@awesome-cordova-plugins/file-opener";
 
 const quoteSaved = "Quote Saved";
 export const DeleteModal = ({ onCancel, onConfirm }) => {
@@ -41,14 +44,26 @@ export const DeleteModal = ({ onCancel, onConfirm }) => {
 };
 
 // Helper function to convert blob to base64
-const convertBlobToBase64 = (blob) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onerror = reject;
-  reader.onload = () => {
-    resolve(reader.result);
-  };
-  reader.readAsDataURL(blob);
-});
+const convertBlobToBase64 = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(blob);
+  });
+
+async function handleBrowserDownload(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 async function hanldlejsx_pdf(item) {
   // Prevent multiple clicks
@@ -79,7 +94,7 @@ async function hanldlejsx_pdf(item) {
       RAM={item.model.config?.RAM}
       formattedDate={formattedDate}
       price={item.price}
-    />
+    />,
   );
 
   const options = {
@@ -93,42 +108,49 @@ async function hanldlejsx_pdf(item) {
 
   try {
     const pdf = html2pdf().set(options).from(printElement);
-    const blob = await pdf.outputPdf('blob');
-    const base64Data = await convertBlobToBase64(blob);
+    const blob = await pdf.outputPdf("blob");
     const fileName = `purchase_receipt_${Date.now()}.pdf`;
 
-    if (Capacitor.getPlatform() === 'ios') {
+    if (!Capacitor.isNativePlatform()) {
+      // Browser: direct download, no share popup
+      await handleBrowserDownload(blob, fileName);
+      return;
+    }
+
+    const base64Data = await convertBlobToBase64(blob);
+
+    if (Capacitor.getPlatform() === "ios") {
       try {
         // Save to Cache directory
         await Filesystem.writeFile({
           path: fileName,
-          data: base64Data.split(',')[1],
+          data: base64Data.split(",")[1],
           directory: Directory.Cache,
-          recursive: true
+          recursive: true,
         });
 
         // Get the file URI
         const fileInfo = await Filesystem.getUri({
           path: fileName,
-          directory: Directory.Cache
+          directory: Directory.Cache,
         });
 
         try {
           // Share the file and wait for the result
           const shareResult = await Share.share({
-            title: 'Purchase Receipt',
-            text: 'Here is your purchase receipt',
+            title: "Purchase Receipt",
+            text: "Here is your purchase receipt",
             url: fileInfo.uri,
-            dialogTitle: 'Share Receipt'
+            dialogTitle: "Share Receipt",
           });
 
           // Handle share result
           if (shareResult.activityType) {
-            console.log('Share completed:', shareResult.activityType);
+            console.log("Share completed:", shareResult.activityType);
           }
         } catch (shareError) {
-          if (shareError.message !== 'Share canceled') {
-            console.error('Share error:', shareError);
+          if (shareError.message !== "Share canceled") {
+            console.error("Share error:", shareError);
           }
         }
 
@@ -136,24 +158,24 @@ async function hanldlejsx_pdf(item) {
         try {
           await Filesystem.deleteFile({
             path: fileName,
-            directory: Directory.Cache
+            directory: Directory.Cache,
           });
         } catch (cleanupError) {
-          console.log('Cleanup error (non-critical):', cleanupError);
+          console.log("Cleanup error (non-critical):", cleanupError);
         }
       } catch (error) {
-        console.error('iOS file handling error:', error);
+        console.error("iOS file handling error:", error);
         // Fallback directly to base64 sharing without showing error
         try {
           await Share.share({
-            title: 'Purchase Receipt',
-            text: 'Here is your purchase receipt',
+            title: "Purchase Receipt",
+            text: "Here is your purchase receipt",
             url: base64Data,
-            dialogTitle: 'Share Receipt'
+            dialogTitle: "Share Receipt",
           });
         } catch (shareError) {
-          if (shareError.message !== 'Share canceled') {
-            console.error('Share fallback error:', shareError);
+          if (shareError.message !== "Share canceled") {
+            console.error("Share fallback error:", shareError);
           }
         }
       }
@@ -162,36 +184,36 @@ async function hanldlejsx_pdf(item) {
       try {
         await Filesystem.writeFile({
           path: fileName,
-          data: base64Data.split(',')[1],
+          data: base64Data.split(",")[1],
           directory: Directory.Cache,
-          recursive: true
+          recursive: true,
         });
 
         const fileInfo = await Filesystem.getUri({
           path: fileName,
-          directory: Directory.Cache
+          directory: Directory.Cache,
         });
 
         // Try Share API first on Android
         try {
           const shareResult = await Share.share({
-            title: 'Purchase Receipt',
-            text: 'Here is your purchase receipt',
+            title: "Purchase Receipt",
+            text: "Here is your purchase receipt",
             url: fileInfo.uri,
-            dialogTitle: 'Share Receipt'
+            dialogTitle: "Share Receipt",
           });
 
           // Handle share result
           if (shareResult.activityType) {
-            console.log('Share completed:', shareResult.activityType);
+            console.log("Share completed:", shareResult.activityType);
           }
         } catch (shareError) {
-          if (shareError.message !== 'Share canceled') {
+          if (shareError.message !== "Share canceled") {
             // If Share fails, try FileOpener as fallback
-            console.log('Share failed, trying FileOpener:', shareError);
+            console.log("Share failed, trying FileOpener:", shareError);
             await FileOpener.open({
               filePath: fileInfo.uri,
-              contentType: 'application/pdf'
+              contentType: "application/pdf",
             });
           }
         }
@@ -200,41 +222,41 @@ async function hanldlejsx_pdf(item) {
         try {
           await Filesystem.deleteFile({
             path: fileName,
-            directory: Directory.Cache
+            directory: Directory.Cache,
           });
         } catch (cleanupError) {
-          console.log('Cleanup error (non-critical):', cleanupError);
+          console.log("Cleanup error (non-critical):", cleanupError);
         }
       } catch (error) {
-        console.error('Android file handling error:', error);
+        console.error("Android file handling error:", error);
         // Final fallback - try sharing base64 directly
         try {
           await Share.share({
-            title: 'Purchase Receipt',
-            text: 'Here is your purchase receipt',
+            title: "Purchase Receipt",
+            text: "Here is your purchase receipt",
             url: base64Data,
-            dialogTitle: 'Share Receipt'
+            dialogTitle: "Share Receipt",
           });
         } catch (finalError) {
-          if (finalError.message !== 'Share canceled') {
-            console.error('All sharing methods failed:', finalError);
+          if (finalError.message !== "Share canceled") {
+            console.error("All sharing methods failed:", finalError);
           }
         }
       }
     }
   } catch (error) {
-    console.error('PDF handling error:', error);
+    console.error("PDF handling error:", error);
     // Instead of showing error, try direct sharing of the HTML content
     try {
       await Share.share({
-        title: 'Purchase Receipt',
-        text: 'Here is your purchase receipt',
+        title: "Purchase Receipt",
+        text: "Here is your purchase receipt",
         url: printElement,
-        dialogTitle: 'Share Receipt'
+        dialogTitle: "Share Receipt",
       });
     } catch (shareError) {
-      if (shareError.message !== 'Share canceled') {
-        console.error('Share fallback error:', shareError);
+      if (shareError.message !== "Share canceled") {
+        console.error("Share fallback error:", shareError);
       }
     }
   } finally {
@@ -278,7 +300,7 @@ const OrdersCard = ({
     };
 
     return new Intl.DateTimeFormat("en-IN", options).format(
-      new Date(dateTimeString)
+      new Date(dateTimeString),
     );
   };
 
@@ -381,10 +403,13 @@ const OrdersCard = ({
           <p className="text-sm font-medium">{title}</p>
         </div>
         {title === "Order Completed" && (
-            <div onClick={() => hanldlejsx_pdf(allData)} className="flex items-center h-full px-4 text-white bg-[#EC2752] rounded-xl">
-              <FaDownload size={15} />
-            </div>
-          )}
+          <div
+            onClick={() => hanldlejsx_pdf(allData)}
+            className="flex items-center h-full px-4 text-white bg-[#EC2752] rounded-xl"
+          >
+            <FaDownload size={15} />
+          </div>
+        )}
         <div className="">
           <p className="text-sm font-medium text-gray-400">
             {formatDateTime(dateTime)}
