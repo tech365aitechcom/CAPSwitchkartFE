@@ -7,7 +7,7 @@ import { ImArrowLeft } from "react-icons/im";
 import store from "../../store/store";
 const currentDomain = window.location.origin;
 const DEFAULT_LOGO = "/Grest_Logo.jpg";
-const BUYBACK_LOGO = "/Grest_Logo_2.jpg"; // Use your actual buyback logo
+const BUYBACK_LOGO = "/Grest_Logo_2.jpg";
 
 const isBuybackDomain = currentDomain === import.meta.env.VITE_BUYBACK_URL;
 const GREST_LOGO = isBuybackDomain ? BUYBACK_LOGO : DEFAULT_LOGO;
@@ -15,6 +15,7 @@ import { useSelector } from "react-redux";
 import banner from "../../assets/banner.jpg";
 import { GoDotFill } from "react-icons/go";
 
+// Image imports (keeping the same as original)
 import quesImg1 from "../../assets/5.jpg";
 import quesImg2 from "../../assets/20.jpg";
 import quesImg3 from "../../assets/8.jpg";
@@ -78,6 +79,7 @@ import acces1 from "../../assets/access1.png";
 import acces2 from "../../assets/access2.png";
 import acces3 from "../../assets/access3.png";
 import acces4 from "../../assets/access4.png";
+
 const imageMap = {
   acces1,
   acces2,
@@ -151,11 +153,12 @@ const imageMap = {
 };
 
 import {
+  initializeGroups,
   setGroupAnswers,
+  updateGroupObject,
   updateCoreObject,
   updateCosmeticsObject,
   updateDisplayObject,
-  //updateFunctionalObject,
   updateAccessoriesObject,
   updateFunctionalMajorObject,
   updateFunctionalMinorObject,
@@ -168,20 +171,43 @@ import { IoIosArrowBack } from "react-icons/io";
 import styless from "../QuickQuote/QuickQuote.module.css";
 import { IoArrowBack } from "react-icons/io5";
 
-const initialState = {
-  Core: [],
-  Cosmetics: [],
-  Display: [],
-  //Functional: [],
-  Accessories: [],
-  "Functional Major": [],
-  "Functional Minor": [],
-  Warranty: [],
-};
 const whiteText = "text-white";
 const blackText = "text-black";
 const pinkBg = "bg-primary";
 const whiteBg = "bg-white";
+
+// Group display configuration
+const GROUP_DISPLAY_CONFIG = {
+  Core: {
+    title: "Basic Condition of the Device",
+    updateAction: updateCoreObject,
+  },
+  Cosmetics: {
+    title: "Physical Condition of the Device",
+    updateAction: updateCosmeticsObject,
+  },
+  Display: {
+    title: "Display Condition of the Device",
+    updateAction: updateDisplayObject,
+  },
+  "Functional Major": {
+    title: "Functional Condition of the Device",
+    updateAction: updateFunctionalMajorObject,
+  },
+  "Functional Minor": {
+    title: "Functional Condition of the Device",
+    updateAction: updateFunctionalMinorObject,
+  },
+  Accessories: {
+    title: "Select Accessories Not Available with Device",
+    updateAction: updateAccessoriesObject,
+  },
+  Warranty: {
+    title: "Please Choose the Appropriate Warranty Period for Your Device",
+    updateAction: updateWarrantyObject,
+    special: true, // Warranty has special handling
+  },
+};
 
 const NewDeviceqs = () => {
   const userToken = sessionStorage.getItem("authToken");
@@ -190,26 +216,31 @@ const NewDeviceqs = () => {
   const { answers, setAnswers } = useQuestionContext();
   const [visible, setVisible] = useState(1);
   const [newGroupanswers, setNewGroupAnswers] = useState();
+  const [availableGroups, setAvailableGroups] = useState([]);
   const profile = useUserProfile();
-  const core = useSelector((state) => state.qna.Core);
-  const Cosmetics = useSelector((state) => state.qna.Cosmetics);
-  const Display = useSelector((state) => state.qna.Display);
-  const Accessories = useSelector((state) => state.qna.Accessories);
-  //const Functional = useSelector((state) => state.qna.Functional);
-  const FunctionalMajor = useSelector((state) => state.qna["Functional Major"]);
-  const FunctionalMinor = useSelector((state) => state.qna["Functional Minor"]);
-  const Warranty = useSelector((state) => state.qna.Warranty);
+
+  // Get dynamic groups from Redux
+  const qnaState = useSelector((state) => state.qna);
+  const groups = qnaState.groups || {};
+  const groupNames = qnaState.groupNames || [];
+
   const [showPopup, setShowPopup] = useState(true);
-  const [NDstate, dispatch] = useReducer(reducer, initialState);
-  const qna = useSelector((state) => state.qna);
+  const [NDstate, dispatch] = useReducer(reducer, { groups: {} });
 
   function reducer(state, action) {
     if (action.type === "SET_GROUP_ANSWERS") {
-      return { ...state, [action.group]: action.answers };
+      return {
+        ...state,
+        groups: {
+          ...state.groups,
+          [action.group]: action.answers,
+        },
+      };
     } else {
       throw new Error();
     }
   }
+
   const fetchData = async () => {
     try {
       const apiUrl = `${
@@ -217,26 +248,24 @@ const NewDeviceqs = () => {
       }/api/questionnaires/findAll?page=0&limit=99&type=${DeviceType}`;
 
       const response = await axios.get(apiUrl, {
-        headers: {
-          authorization: `${userToken}`,
-        },
+        headers: { authorization: `${userToken}` },
       });
 
-      // Sort by viewOn field (assuming it's a number; modify for strings)
       const sortedData = response.data.data.sort((a, b) => a.viewOn - b.viewOn);
 
-      [
-        "Core",
-        "Cosmetics",
-        "Display",
-        "Accessories",
-        //"Functional",
-        "Functional Major",
-        "Functional Minor",
-        "Warranty",
-      ].forEach((group) => {
+      // Extract unique group names from the questionnaires
+      const uniqueGroups = [
+        ...new Set(sortedData.map((q) => q.groupName).filter(Boolean)),
+      ];
+      setAvailableGroups(uniqueGroups);
+
+      // Initialize Redux with dynamic groups
+      store.dispatch(initializeGroups({ groupNames: uniqueGroups }));
+
+      // Populate each group with its questions
+      uniqueGroups.forEach((group) => {
         const answersTemp = sortedData.filter(
-          (question) => question.groupName === group
+          (question) => question.groupName === group,
         );
         dispatch({ type: "SET_GROUP_ANSWERS", group, answers: answersTemp });
       });
@@ -249,56 +278,30 @@ const NewDeviceqs = () => {
         const newAnswers = newPopulateAnswers.map((answer, index) => {
           const questionData = sortedData[index];
 
-          if (questionData.yes === answer && questionData.no === answer) {
-            return {
-              quetion: questionData.quetion,
-              answer,
-              key: "no",
-              group: questionData.group,
-              groupName: questionData.groupName,
-              selected: Array(questionData.options.length).fill(false),
-            };
-          } else if (questionData.yes === answer) {
-            return {
-              quetion: questionData.quetion,
-              answer,
-              key: "yes",
-              group: questionData.group,
-              groupName: questionData.groupName,
-              selected: Array(questionData.options.length).fill(true),
-            };
-          } else {
-            return {
-              quetion: questionData.quetion,
-              answer,
-              group: questionData.group,
-              groupName: questionData.groupName,
-              key: "no",
-              selected: Array(questionData.options.length).fill(false),
-            };
-          }
+          // Always initialize with all options unselected (false)
+          // The user should click to select options, not start with selections
+          return {
+            quetion: questionData.quetion,
+            answer,
+            key: questionData.default === questionData.yes ? "yes" : "no",
+            group: questionData.group,
+            groupName: questionData.groupName,
+            selected: Array(questionData.options.length).fill(false), // Always false initially
+          };
         });
 
         setAnswers(newAnswers);
         setNewGroupAnswers(newAnswers);
-        answersToProcess = newAnswers; // <-- 2. Assign newAnswers to it
+        answersToProcess = newAnswers;
       } else {
-        answersToProcess = answers; // <-- 3. Assign existing answers to it
-        setNewGroupAnswers(answers); // Make sure this is also set
+        answersToProcess = answers;
+        setNewGroupAnswers(answers);
       }
 
-      // 4. Move this logic OUTSIDE the 'if' block
-      [
-        "Core",
-        "Cosmetics",
-        "Display",
-        "Accessories",
-        "Functional Major",
-        "Functional Minor",
-        "Warranty",
-      ].forEach((group) => {
+      // Dispatch to Redux for all groups dynamically
+      uniqueGroups.forEach((group) => {
         const answersTemp = answersToProcess.filter(
-          (question) => question.groupName === group
+          (question) => question.groupName === group,
         );
         store.dispatch(setGroupAnswers({ group, answers: answersTemp }));
       });
@@ -317,7 +320,7 @@ const NewDeviceqs = () => {
 
   const updateAns = (group) => {
     const filteredAnswers = newGroupanswers.filter(
-      (question) => question.group === group
+      (question) => question.group === group,
     );
     store.dispatch(setGroupAnswers({ group, filteredAnswers }));
     if (showPopup === false) {
@@ -325,27 +328,31 @@ const NewDeviceqs = () => {
     }
   };
 
-  const parts = [
-    { component: FirstPart, data: NDstate.Core, slice: core },
-    //{ component: SixthPart, data: NDstate.Functional, slice: Functional },
-    { component: SecondPart, data: NDstate.Cosmetics, slice: Cosmetics },
-    { component: ThirdPart, data: NDstate.Display, slice: Display },
-    {
-      component: FourthPart,
-      data: NDstate.Functional_major,
-      slice: FunctionalMajor,
-    },
-    {
-      component: FifthPart,
-      data: NDstate.Functional_minor,
-      slice: FunctionalMinor,
-    },
-    { component: SeventhPart, data: NDstate.Accessories, slice: Accessories },
-    { component: EighthPart, data: NDstate.Warranty, slice: Warranty },
-  ];
+  // Build parts array dynamically based on available groups
+  const parts = availableGroups
+    .map((groupName) => {
+      const groupData = NDstate.groups[groupName];
+      const groupSlice = groups[groupName];
+
+      if (!groupData || groupData.length === 0) {
+        return null;
+      }
+
+      return {
+        component: DynamicGroupComponent,
+        groupName: groupName,
+        data: groupData,
+        slice: groupSlice,
+        config: GROUP_DISPLAY_CONFIG[groupName] || {
+          title: groupName,
+          updateAction: updateGroupObject,
+        },
+      };
+    })
+    .filter(Boolean);
 
   const availableParts = parts.filter(
-    (part) => part.data && part.data.length > 0
+    (part) => part.data && part.data.length > 0,
   );
 
   return (
@@ -368,13 +375,16 @@ const NewDeviceqs = () => {
         setVisible={setVisible}
         updateAns={updateAns}
         showPopup={showPopup}
-        qna={qna}
+        qna={qnaState}
         profile={profile}
+        groups={groups}
       />
     </>
   );
 };
+
 export default NewDeviceqs;
+
 const MainQContainer = ({
   NDstate,
   setIsSearchOpen,
@@ -387,9 +397,11 @@ const MainQContainer = ({
   showPopup,
   qna,
   profile,
+  groups,
 }) => {
   const navigate = useNavigate();
   const CurrentPart = availableParts[visible - 1]?.component;
+  const currentPartData = availableParts[visible - 1];
 
   return (
     <div className="mainQContainer">
@@ -426,10 +438,12 @@ const MainQContainer = ({
           </div>
           <div className="underline"></div>
           <div className="questionList">
-            {CurrentPart && (
+            {CurrentPart && currentPartData && (
               <CurrentPart
-                NDstate={NDstate}
-                slice={availableParts[visible - 1]?.slice}
+                groupName={currentPartData.groupName}
+                data={currentPartData.data}
+                slice={currentPartData.slice}
+                config={currentPartData.config}
               />
             )}
           </div>
@@ -443,432 +457,142 @@ const MainQContainer = ({
         qna={qna}
         profile={profile}
         availableParts={availableParts}
+        groups={groups}
       />
     </div>
   );
 };
 
-const FirstPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="subheading">
-        <GoDotFill size={15} />
-        <h2>Basic Condition of the Device</h2>
-      </div>
-      <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate.Core &&
-          NDstate.Core.map((data, index) => (
-            <React.Fragment key={data._id}>
-              {data?.options.map((option, optionIndex) => (
-                <React.Fragment key={optionIndex}>
-                  <div
-                    onClick={(e) => {
-                      console.log(slice);
-                      console.log("firstPart-option", option);
-                      console.log("firstPart-data", data);
-                      console.log(optionIndex + "ok");
-                      store.dispatch(
-                        updateCoreObject({
-                          index: index,
-                          yesKey: data.yes,
-                          noKey: data.no,
-                          newKey: "yes",
-                          selectedIndex: optionIndex,
-                        })
-                      );
-                    }}
-                    className={`px-3 flex flex-col items-center  w-[48%] min-h-[150px] shadow-lg rounded-lg ${
-                      !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                    }`}
-                  >
-                    <div className=" mb-1  mt-3 rounded-md overflow-hidden bg-white">
-                      <img
-                        className="scale-[1.2]"
-                        src={imageMap[option?.img] || option?.img}
-                      />
-                    </div>
-                    <div className="border-t-[1.5px]   w-full py-2">
-                      <p
-                        className={`font-medium  text-xs text-center ${
-                          !slice[index]?.selected[optionIndex]
-                            ? blackText
-                            : whiteText
+// Dynamic component that renders any group
+const DynamicGroupComponent = ({ groupName, data, slice, config }) => {
+  // Special handling for Warranty group
+  if (config.special && groupName === "Warranty") {
+    return (
+      <div className="containClass">
+        <div className="subheading">
+          <GoDotFill size={20} />
+          <h2>{config.title}</h2>
+        </div>
+        <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
+          {data &&
+            data.map((questionData, index) => (
+              <React.Fragment key={questionData._id}>
+                {questionData?.options.map((option, optionIndex) => {
+                  // Safely check if item is selected
+                  const isSelected =
+                    slice &&
+                    slice[index] &&
+                    slice[index].selected &&
+                    slice[index].selected[optionIndex];
+
+                  return (
+                    <React.Fragment key={optionIndex}>
+                      <div
+                        onClick={(e) => {
+                          store.dispatch(
+                            updateWarrantyObject({
+                              index: index,
+                              newKey: "yes",
+                              newAnswer: questionData.yes,
+                            }),
+                          );
+                        }}
+                        className={`w-[48%] flex flex-col items-center px-3 min-h-[150px] shadow-lg rounded-lg cursor-pointer ${
+                          isSelected ? pinkBg : whiteBg
                         }`}
                       >
-                        {option.caption}
-                      </p>
-                    </div>
-                  </div>
-                </React.Fragment>
-              ))}
-            </React.Fragment>
-          ))}
-      </div>
-      <div className="flex mt-4 bg-primary text-white font-medium py-2 px-3 text-sm text-pretty rounded-md">
-        Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
-
-const SecondPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="subheading">
-        <GoDotFill size={20} />
-        <h2>Physical Condition of the Device</h2>
-      </div>
-      <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate.Cosmetics &&
-          NDstate.Cosmetics.map((data, index) => {
-            return (
-              <React.Fragment key={data._id}>
-                {data?.options.map((option, optionIndex) => (
-                  <React.Fragment key={optionIndex}>
-                    <div
-                      onClick={(e) => {
-                        console.log(slice);
-                        console.log("secondPart-option", option);
-                        console.log("secondPart-data", data);
-                        console.log(optionIndex + "ok");
-                        store.dispatch(
-                          updateCosmeticsObject({
-                            index: index,
-                            yesKey: data.yes,
-                            noKey: data.no,
-                            selectedIndex: optionIndex,
-                            newKey: "yes",
-                          })
-                        );
-                      }}
-                      className={`flex flex-col items-center px-3 w-[48%] min-h-[150px] shadow-lg rounded-lg ${
-                        !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                      }`}
-                    >
-                      <div className="mt-3 mb-1 rounded-md overflow-hidden bg-white">
-                        <img
-                          src={imageMap[option?.img] || option?.img}
-                          className="scale-[1.2]"
-                        />
+                        <div className="mt-3 mb-1 overflow-hidden bg-white rounded-md">
+                          <img
+                            className="scale-[1.2]"
+                            src={imageMap[option?.img] || option?.img}
+                            alt={option.caption}
+                          />
+                        </div>
+                        <div className="border-t-[1.5px] w-full py-2">
+                          <p
+                            className={`text-xs text-center font-medium ${
+                              isSelected ? whiteText : blackText
+                            }`}
+                          >
+                            {option.caption}
+                          </p>
+                        </div>
                       </div>
-                      <div className="w-full border-t-[1.5px] py-2">
-                        <p
-                          className={`text-xs font-medium text-center ${
-                            !slice[index]?.selected[optionIndex]
-                              ? blackText
-                              : whiteText
-                          }`}
-                        >
-                          {option.caption}
-                        </p>
-                      </div>
-                    </div>
-                  </React.Fragment>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
               </React.Fragment>
-            );
-          })}
+            ))}
+        </div>
       </div>
-      <div className="flex mt-4 bg-primary text-white font-medium py-2 px-3 text-sm text-pretty rounded-md">
-        Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
+    );
+  }
 
-const ThirdPart = ({ NDstate, slice }) => {
+  // Standard rendering for all other groups
   return (
     <div className="containClass">
       <div className="subheading">
         <GoDotFill size={20} />
-        <h2>Display Condition of the Device</h2>
+        <h2>{config.title}</h2>
       </div>
       <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate.Display &&
-          NDstate.Display.map((data, index) => (
-            <React.Fragment key={data._id}>
-              {data?.options.map((option, optionIndex) => (
-                <React.Fragment key={optionIndex}>
-                  <div
-                    onClick={(e) => {
-                      console.log(slice);
-                      console.log("thirdPart-data", data);
-                      console.log("thirdPart-option", option);
-                      console.log(optionIndex + "ok");
-                      store.dispatch(
-                        updateDisplayObject({
-                          index: index,
-                          noKey: data.no,
-                          yesKey: data.yes,
-                          newKey: "yes",
-                          selectedIndex: optionIndex,
-                        })
-                      );
-                    }}
-                    className={`min-h-[150px] flex flex-col items-center px-3 w-[48%]  shadow-lg rounded-lg ${
-                      !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                    }`}
-                  >
-                    <div className="  overflow-hidden mt-3 mb-1 rounded-md bg-white">
-                      <img
-                        className="scale-[1.2]"
-                        src={imageMap[option?.img] || option?.img}
-                      />
-                    </div>
-                    <div className="w-full py-2 border-t-[1.5px] ">
-                      <p
-                        className={`text-center text-xs font-medium  ${
-                          !slice[index]?.selected[optionIndex]
-                            ? blackText
-                            : whiteText
-                        }`}
-                      >
-                        {option.caption}
-                      </p>
-                    </div>
-                  </div>
-                </React.Fragment>
-              ))}
-            </React.Fragment>
-          ))}
-      </div>
-      <div className="flex bg-primary mt-4  text-white font-medium py-2 px-3 text-sm text-pretty rounded-md">
-        Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
+        {data &&
+          data.map((questionData, index) => (
+            <React.Fragment key={questionData._id}>
+              {questionData?.options.map((option, optionIndex) => {
+                // Safely check if item is selected
+                const isSelected =
+                  slice &&
+                  slice[index] &&
+                  slice[index].selected &&
+                  slice[index].selected[optionIndex];
 
-const FourthPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="subheading">
-        <GoDotFill size={20} />
-        <h2>Functional Condition of the Device</h2>
-      </div>
-      <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate?.["Functional Major"] &&
-          NDstate?.["Functional Major"].map((data, index) => (
-            <React.Fragment key={data._id}>
-              {data?.options.map((option, optionIndex) => (
-                <React.Fragment key={optionIndex}>
-                  <div
-                    onClick={(e) => {
-                      console.log(slice);
-                      console.log("fourth-option", option);
-                      console.log("fourth-data", data);
-                      console.log(optionIndex + "ok");
-                      store.dispatch(
-                        updateFunctionalMajorObject({
-                          index: index,
-                          yesKey: data.yes,
-                          noKey: data.no,
-                          selectedIndex: optionIndex,
-                          newKey: "yes",
-                        })
-                      );
-                    }}
-                    className={`flex  px-3  flex-col min-h-[150px] items-center w-[48%]  shadow-lg rounded-lg ${
-                      !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                    }`}
-                  >
-                    <div className="mt-3 mb-1 rounded-md bg-white overflow-hidden">
-                      <img
-                        className="scale-[1.2]"
-                        src={imageMap[option?.img] || option?.img}
-                      />
-                    </div>
-                    <div className="border-t-[1.5px] w-full py-2">
-                      <p
-                        className={`text-xs font-medium ${
-                          !slice[index]?.selected[optionIndex]
-                            ? blackText
-                            : whiteText
-                        } text-center `}
-                      >
-                        {option.caption}
-                      </p>
-                    </div>
-                  </div>
-                </React.Fragment>
-              ))}
-            </React.Fragment>
-          ))}
-      </div>
-      <div className="flex mt-4 bg-primary  px-3 text-white font-medium py-2 text-sm text-pretty rounded-md">
-        Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
-
-const FifthPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="subheading">
-        <GoDotFill size={20} />
-        <h2>Functional Condition of the Device</h2>
-      </div>
-      <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate?.["Functional Minor"] &&
-          NDstate?.["Functional Minor"].map((data, index) => (
-            <React.Fragment key={data._id}>
-              {data?.options.map((option, optionIndex) => (
-                <React.Fragment key={optionIndex}>
-                  <div
-                    className={`flex flex-col items-center px-3 w-[48%] min-h-[150px] shadow-lg rounded-lg ${
-                      !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                    }`}
-                    onClick={(e) => {
-                      console.log(slice);
-                      console.log("fifth-option", option);
-                      console.log("fifth-data", data);
-                      console.log(optionIndex + "ok");
-                      store.dispatch(
-                        updateFunctionalMinorObject({
-                          index: index,
-                          yesKey: data.yes,
-                          noKey: data.no,
-                          newKey: "yes",
-                          selectedIndex: optionIndex,
-                        })
-                      );
-                    }}
-                  >
-                    <div className="mt-3 mb-1 rounded-md overflow-hidden bg-white">
-                      <img
-                        className="scale-[1.2]"
-                        src={imageMap[option?.img] || option?.img}
-                      />
-                    </div>
-                    <div className="border-t-[1.5px]   py-2 w-full ">
-                      <p
-                        className={`text-xs    text-center  font-medium${
-                          !slice[index]?.selected[optionIndex]
-                            ? blackText
-                            : whiteText
-                        }`}
-                      >
-                        {option.caption}
-                      </p>
-                    </div>
-                  </div>
-                </React.Fragment>
-              ))}
-            </React.Fragment>
-          ))}
-      </div>
-      <div className="flex  mt-4 bg-primary text-white font-medium text-pretty  py-2 px-3  text-sm rounded-md">
-        Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
-/* const SixthPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="text-sm text-[#676767] py-1 font-medium text-center text-pretty">
-        <p>Please choose appropriate condition to get accurate quote</p>
-      </div>
-      <div className="grid grid-cols-2 gap-y-3 gap-x-[4%]">
-        {NDstate?.Functional &&
-          NDstate?.Functional.map((data, index) => (
-            <div
-              key={data._id}
-              className={`${
-                slice[index]?.answer === data.yes ? pinkBg : whiteBg
-              } flex flex-col justify-start items-center shadow-lg rounded-lg px-3`}
-              onClick={() => {
-                if (slice[index]?.answer === data.yes) {
-                  store.dispatch(
-                    updateFunctionalObject({
-                      index: index,
-                      newAnswer: data.no,
-                      newKey: "no",
-                    })
-                  );
-                } else {
-                  store.dispatch(
-                    updateFunctionalObject({
-                      index: index,
-                      newAnswer: data.yes,
-                      newKey: "yes",
-                    })
-                  );
-                }
-              }}
-            >
-              <div className="mt-3 mb-1 rounded-md overflow-hidden bg-white">
-                <img
-                  className="scale-[1.2]"
-                  src={imageMap[data?.options[0]?.img] || data?.options[0]?.img}
-                />
-              </div>
-              <div className="w-full border-t-[1.5px] py-2">
-                <p
-                  className={`${
-                    slice[index]?.answer === data.yes ? whiteText :  blackText
-                  } text-xs font-medium text-center`}
-                >
-                  {data.quetion}
-                </p>
-              </div>
-            </div>
-          ))}
-      </div>
-      <div className="flex mt-4 bg-primary text-white font-medium py-2 px-3 text-sm text-pretty rounded-md">
-        Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
- */
-const SeventhPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="subheading">
-        <GoDotFill size={20} />
-        <h2>Select Accessories Not Available with Device</h2>
-      </div>
-      <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate.Accessories &&
-          NDstate.Accessories.map((data, index) => {
-            return (
-              <React.Fragment key={data._id}>
-                {data?.options.map((option, optionIndex) => (
+                return (
                   <React.Fragment key={optionIndex}>
                     <div
-                      className={`flex flex-col items-center px-3 w-[48%] min-h-[150px] shadow-lg rounded-lg ${
-                        !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                      }`}
                       onClick={(e) => {
-                        console.log(slice);
-                        console.log("six-option", option);
-                        console.log("six-data", data);
-                        console.log(optionIndex + "ok");
-                        store.dispatch(
-                          updateAccessoriesObject({
-                            noKey: data.no,
-                            index: index,
-                            yesKey: data.yes,
-                            newKey: "yes",
-                            selectedIndex: optionIndex,
-                          })
-                        );
+                        // Use group-specific update action if available, otherwise use generic
+                        const updateAction =
+                          config.updateAction || updateGroupObject;
+
+                        if (updateAction === updateGroupObject) {
+                          // Generic update
+                          store.dispatch(
+                            updateGroupObject({
+                              group: groupName,
+                              index: index,
+                              yesKey: questionData.yes,
+                              noKey: questionData.no,
+                              selectedIndex: optionIndex,
+                            }),
+                          );
+                        } else {
+                          // Specific group update (for backward compatibility)
+                          store.dispatch(
+                            updateAction({
+                              index: index,
+                              yesKey: questionData.yes,
+                              noKey: questionData.no,
+                              selectedIndex: optionIndex,
+                            }),
+                          );
+                        }
                       }}
+                      className={`flex flex-col items-center px-3 w-[48%] min-h-[150px] shadow-lg rounded-lg cursor-pointer transition-colors ${
+                        isSelected ? pinkBg : whiteBg
+                      }`}
                     >
                       <div className="mt-3 mb-1 rounded-md overflow-hidden bg-white">
                         <img
                           className="scale-[1.2]"
                           src={imageMap[option?.img] || option?.img}
+                          alt={option.caption}
                         />
                       </div>
                       <div className="border-t-[1.5px] w-full py-2">
                         <p
                           className={`text-xs font-medium text-center ${
-                            !slice[index]?.selected[optionIndex]
-                              ? blackText
-                              : whiteText
+                            isSelected ? whiteText : blackText
                           }`}
                         >
                           {option.caption}
@@ -876,71 +600,13 @@ const SeventhPart = ({ NDstate, slice }) => {
                       </div>
                     </div>
                   </React.Fragment>
-                ))}
-              </React.Fragment>
-            );
-          })}
+                );
+              })}
+            </React.Fragment>
+          ))}
       </div>
       <div className="flex mt-4 bg-primary text-white font-medium py-2 px-3 text-sm text-pretty rounded-md">
         Continue, If you don't have any Above-Mentioned Issues.
-      </div>
-    </div>
-  );
-};
-
-const EighthPart = ({ NDstate, slice }) => {
-  return (
-    <div className="containClass">
-      <div className="subheading">
-        <GoDotFill size={20} />
-        <h2>Please Choose the Appropriate Warranty Period for Your Device</h2>
-      </div>
-      <div className="w-full flex flex-wrap gap-y-3 gap-x-[4%] justify-start flex-row">
-        {NDstate?.Warranty &&
-          NDstate?.Warranty.map((data, index) => (
-            <React.Fragment key={data._id}>
-              {data?.options.map((option, optionIndex) => (
-                <React.Fragment key={optionIndex}>
-                  <div
-                    onClick={(e) => {
-                      console.log(slice);
-                      console.log("eight-option", option);
-                      console.log("eight-data", data);
-                      console.log(optionIndex + "ok");
-                      store.dispatch(
-                        updateWarrantyObject({
-                          index: index,
-                          newKey: "yes",
-                          newAnswer: data.yes,
-                        })
-                      );
-                    }}
-                    className={` w-[48%]  flex flex-col items-center px-3 min-h-[150px] shadow-lg rounded-lg ${
-                      !slice[index]?.selected[optionIndex] ? whiteBg : pinkBg
-                    }`}
-                  >
-                    <div className="mt-3 mb-1 overflow-hidden bg-white  rounded-md ">
-                      <img
-                        className="scale-[1.2]"
-                        src={imageMap[option?.img] || option?.img}
-                      />
-                    </div>
-                    <div className="border-t-[1.5px] w-full py-2">
-                      <p
-                        className={`text-xs text-center  font-medium ${
-                          !slice[index]?.selected[optionIndex]
-                            ? blackText
-                            : whiteText
-                        }`}
-                      >
-                        {option.caption}
-                      </p>
-                    </div>
-                  </div>
-                </React.Fragment>
-              ))}
-            </React.Fragment>
-          ))}
       </div>
     </div>
   );
@@ -954,6 +620,7 @@ const AboveSix = ({
   qna,
   profile,
   availableParts,
+  groups,
 }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -973,17 +640,18 @@ const AboveSix = ({
   function formatQNAByType(qna, type) {
     if (type === "CTG2") {
       return {
-        Cosmetics: qna.Cosmetics,
-        Display: qna.Display,
-        "Functional Major": qna["Functional Major"],
-        "Functional Minor": qna["Functional Minor"],
-        Accessories: qna.Accessories,
-        Warranty: qna.Warranty,
+        Cosmetics: qna.groups?.Cosmetics || [],
+        Display: qna.groups?.Display || [],
+        "Functional Major": qna.groups?.["Functional Major"] || [],
+        "Functional Minor": qna.groups?.["Functional Minor"] || [],
+        Accessories: qna.groups?.Accessories || [],
+        Warranty: qna.groups?.Warranty || [],
         Core: [],
       };
     }
 
-    return qna;
+    // Return all groups dynamically
+    return qna.groups || {};
   }
 
   const handlesubmit = async () => {
@@ -992,6 +660,7 @@ const AboveSix = ({
     const DeviceType = sessionStorage.getItem("DeviceType");
     setIsLoading(true);
     console.log(id, profile);
+
     const finalPayload = {
       QNA: formatQNAByType(qna, DeviceType),
       phoneNumber: id?.phoneNumber ? id?.phoneNumber : "123456789",
@@ -1001,31 +670,38 @@ const AboveSix = ({
       ram: id?.models?.config?.RAM,
       name: id?.customerName ? id?.customerName : profile?.name,
     };
+
     console.log("finalPayload", finalPayload);
-    const billData = finalPayload.QNA.Accessories.find(
-      (item) => item.quetion && item.quetion.toLowerCase().includes("bill")
+
+    // Find bill data from Accessories if available
+    const accessoriesData =
+      finalPayload.QNA.Accessories || groups.Accessories || [];
+    const billData = accessoriesData.find(
+      (item) => item.quetion && item.quetion.toLowerCase().includes("bill"),
     );
+
     if (billData) {
       sessionStorage.setItem("billData", JSON.stringify(billData));
     } else {
-      sessionStorage.setItem(
-        "billData",
-        JSON.stringify(finalPayload.QNA.Cosmetics[6])
-      );
+      const cosmeticsData =
+        finalPayload.QNA.Cosmetics || groups.Cosmetics || [];
+      if (cosmeticsData[6]) {
+        sessionStorage.setItem("billData", JSON.stringify(cosmeticsData[6]));
+      }
       console.log("No Accessories item with 'bill' found.");
     }
+
     const response = await axios.post(
-      `${
-        import.meta.env.VITE_REACT_APP_ENDPOINT
-      }/api/questionnaires/calculatePrice`,
+      `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/questionnaires/calculatePrice`,
       finalPayload,
-      { headers: { Authorization: userToken2 } }
+      { headers: { Authorization: userToken2 } },
     );
+
     await logQuickQuoteAttempt(response.data.data, id);
     sessionStorage.setItem("LeadId", response.data.data.id);
     sessionStorage.setItem(
       "responsedatadata",
-      JSON.stringify({ ...response.data.data, bonus: 0 })
+      JSON.stringify({ ...response.data.data, bonus: 0 }),
     );
     sessionStorage.setItem("ExactQuote", true);
     store.dispatch(setResponseData({ ...response.data.data, bonus: 0 }));
@@ -1040,6 +716,7 @@ const AboveSix = ({
       console.error("Cannot log quote: Missing critical data.");
       return;
     }
+
     const logPayload = {
       quoteType: "Get Exact Value",
       quoteAmount: quoteResult.price,
@@ -1054,13 +731,12 @@ const AboveSix = ({
         series: deviceModel?.models?.series,
       },
     };
+
     try {
       await axios.post(
-        `${
-          import.meta.env.VITE_REACT_APP_ENDPOINT
-        }/api/quoteTracking/log-quote-attempt`,
+        `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/quoteTracking/log-quote-attempt`,
         logPayload,
-        { headers: { Authorization: token } }
+        { headers: { Authorization: token } },
       );
     } catch (error) {
       console.error("Error logging Quick Quote attempt:", error);
@@ -1097,11 +773,11 @@ const AboveSix = ({
           {visible > 0 && visible <= availableParts.length && (
             <button
               onClick={handleSubtract}
-              className={`  ${
+              className={`${
                 visible < 2
                   ? "bg-slate-400 cursor-not-allowed"
                   : "bg-primary cursor-pointer"
-              }  w-[30%] px-6 py-2 rounded-lg flex items-center justify-center`}
+              } w-[30%] px-6 py-2 rounded-lg flex items-center justify-center`}
             >
               <ImArrowLeft color="white" size={20} />
             </button>
