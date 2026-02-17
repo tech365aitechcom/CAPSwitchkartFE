@@ -16,7 +16,12 @@ import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileOpener } from "@awesome-cordova-plugins/file-opener";
+import { fetchSignatureAsBase64 } from "../../utils/fetchSignatureAsBase64";
 
+const purchaseReceiptTitle = "Purchase Receipt";
+const herePurchaseReceipt = "Here is your purchase receipt";
+const shareReceipt = "Share Receipt";
+const shareCanceled = "Share canceled";
 const quoteSaved = "Quote Saved";
 export const DeleteModal = ({ onCancel, onConfirm }) => {
   return (
@@ -66,18 +71,59 @@ async function handleBrowserDownload(blob, fileName) {
 }
 
 async function hanldlejsx_pdf(item) {
-  // Prevent multiple clicks
-  if (window._isSharing) return;
+  if (window._isSharing) {
+    return;
+  }
   window._isSharing = true;
 
-  const dateString = item.updatedAt;
-  const formattedDate = new Date(dateString).toLocaleDateString("en-IN", {
+  try {
+    const printElement = await buildPrintElement(item);
+    const pdf = html2pdf().set(getPdfOptions()).from(printElement).toPdf();
+    const blob = await pdf.output("blob");
+    const fileName = `purchase_receipt_${Date.now()}.pdf`;
+
+    // Check if running in Capacitor (native app) or browser
+    if (Capacitor.isNativePlatform()) {
+      // Native app behavior (existing functionality)
+      const base64Data = await convertBlobToBase64(blob);
+      if (Capacitor.getPlatform() === "ios") {
+        await handleIOSSharing(base64Data, fileName);
+      } else {
+        await handleAndroidSharing(base64Data, fileName);
+      }
+    } else {
+      // Browser behavior - direct download
+      await handleBrowserDownload(blob, fileName);
+    }
+  } catch (error) {
+    console.error("PDF handling error:", error);
+    if (Capacitor.isNativePlatform()) {
+      await tryDirectHtmlShare(printElement);
+    } else {
+      console.error("Failed to download PDF in browser");
+    }
+  } finally {
+    setTimeout(() => {
+      window._isSharing = false;
+    }, 500);
+  }
+}
+
+async function buildPrintElement(item) {
+  console.log("order item", item);
+  const formattedDate = new Date(item.updatedAt).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
+  const signatureUrl = item?.doc?.signature;
+  const signatureBase64 = signatureUrl
+    ? await fetchSignatureAsBase64(signatureUrl)
+    : null;
 
-  const printElement = ReactDOMServer.renderToString(
+  const maskInfo = item.companyInfo.maskInfo;
+
+  return ReactDOMServer.renderToString(
     <PurchaseReceipt
       phoneNumber={item.phoneNumber}
       aadharNumber={item?.aadharNumber}
@@ -87,17 +133,21 @@ async function hanldlejsx_pdf(item) {
       imeiNumber={item.doc.IMEI}
       phoneName={item.model.name}
       type={item?.model?.type}
-      storeName={item.store.storeName}
-      region={item.store.region}
-      address={item.store.address}
+      // storeName={item.store.storeName}
+      // region={item.store.region}
+      // address={item.store.address}
       storage={item.model.config?.storage}
       RAM={item.model.config?.RAM}
       formattedDate={formattedDate}
       price={item.price}
+      signatureUrl={signatureBase64 || signatureUrl}
+      maskInfo={maskInfo}
     />,
   );
+}
 
-  const options = {
+function getPdfOptions() {
+  return {
     margin: 10,
     filename: "purchase_receipt.pdf",
     image: { type: "jpeg", quality: 0.98 },
@@ -105,165 +155,93 @@ async function hanldlejsx_pdf(item) {
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     pagebreak: { mode: ["css", "legacy"] },
   };
+}
 
+async function handleIOSSharing(base64Data, fileName) {
   try {
-    const pdf = html2pdf().set(options).from(printElement);
-    const blob = await pdf.outputPdf("blob");
-    const fileName = `purchase_receipt_${Date.now()}.pdf`;
+    const uri = await writeFileToCache(base64Data, fileName);
+    await tryShare({ url: uri });
+    await cleanupFile(fileName);
+  } catch (err) {
+    console.error("iOS file handling error:", err);
+    await tryShare({ url: base64Data });
+  }
+}
 
-    if (!Capacitor.isNativePlatform()) {
-      // Browser: direct download, no share popup
-      await handleBrowserDownload(blob, fileName);
-      return;
+async function handleAndroidSharing(base64Data, fileName) {
+  try {
+    const uri = await writeFileToCache(base64Data, fileName);
+    try {
+      await tryShare({ url: uri });
+    } catch (shareError) {
+      console.log("Share failed, trying FileOpener:", shareError);
+      await FileOpener.open({
+        filePath: uri,
+        contentType: "application/pdf",
+      });
     }
+    await cleanupFile(fileName);
+  } catch (err) {
+    console.error("Android file handling error:", err);
+    await tryShare({ url: base64Data });
+  }
+}
 
-    const base64Data = await convertBlobToBase64(blob);
+async function writeFileToCache(base64Data, fileName) {
+  await Filesystem.writeFile({
+    data: base64Data.split(",")[1],
+    path: fileName,
+    recursive: true,
+    directory: Directory.Cache,
+  });
+  const { uri } = await Filesystem.getUri({
+    path: fileName,
+    directory: Directory.Cache,
+  });
+  return uri;
+}
 
-    if (Capacitor.getPlatform() === "ios") {
-      try {
-        // Save to Cache directory
-        await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data.split(",")[1],
-          directory: Directory.Cache,
-          recursive: true,
-        });
-
-        // Get the file URI
-        const fileInfo = await Filesystem.getUri({
-          path: fileName,
-          directory: Directory.Cache,
-        });
-
-        try {
-          // Share the file and wait for the result
-          const shareResult = await Share.share({
-            title: "Purchase Receipt",
-            text: "Here is your purchase receipt",
-            url: fileInfo.uri,
-            dialogTitle: "Share Receipt",
-          });
-
-          // Handle share result
-          if (shareResult.activityType) {
-            console.log("Share completed:", shareResult.activityType);
-          }
-        } catch (shareError) {
-          if (shareError.message !== "Share canceled") {
-            console.error("Share error:", shareError);
-          }
-        }
-
-        // Clean up after sharing attempt (whether successful or canceled)
-        try {
-          await Filesystem.deleteFile({
-            path: fileName,
-            directory: Directory.Cache,
-          });
-        } catch (cleanupError) {
-          console.log("Cleanup error (non-critical):", cleanupError);
-        }
-      } catch (error) {
-        console.error("iOS file handling error:", error);
-        // Fallback directly to base64 sharing without showing error
-        try {
-          await Share.share({
-            title: "Purchase Receipt",
-            text: "Here is your purchase receipt",
-            url: base64Data,
-            dialogTitle: "Share Receipt",
-          });
-        } catch (shareError) {
-          if (shareError.message !== "Share canceled") {
-            console.error("Share fallback error:", shareError);
-          }
-        }
-      }
-    } else {
-      // Android handling
-      try {
-        await Filesystem.writeFile({
-          path: fileName,
-          data: base64Data.split(",")[1],
-          directory: Directory.Cache,
-          recursive: true,
-        });
-
-        const fileInfo = await Filesystem.getUri({
-          path: fileName,
-          directory: Directory.Cache,
-        });
-
-        // Try Share API first on Android
-        try {
-          const shareResult = await Share.share({
-            title: "Purchase Receipt",
-            text: "Here is your purchase receipt",
-            url: fileInfo.uri,
-            dialogTitle: "Share Receipt",
-          });
-
-          // Handle share result
-          if (shareResult.activityType) {
-            console.log("Share completed:", shareResult.activityType);
-          }
-        } catch (shareError) {
-          if (shareError.message !== "Share canceled") {
-            // If Share fails, try FileOpener as fallback
-            console.log("Share failed, trying FileOpener:", shareError);
-            await FileOpener.open({
-              filePath: fileInfo.uri,
-              contentType: "application/pdf",
-            });
-          }
-        }
-
-        // Clean up after sharing attempt
-        try {
-          await Filesystem.deleteFile({
-            path: fileName,
-            directory: Directory.Cache,
-          });
-        } catch (cleanupError) {
-          console.log("Cleanup error (non-critical):", cleanupError);
-        }
-      } catch (error) {
-        console.error("Android file handling error:", error);
-        // Final fallback - try sharing base64 directly
-        try {
-          await Share.share({
-            title: "Purchase Receipt",
-            text: "Here is your purchase receipt",
-            url: base64Data,
-            dialogTitle: "Share Receipt",
-          });
-        } catch (finalError) {
-          if (finalError.message !== "Share canceled") {
-            console.error("All sharing methods failed:", finalError);
-          }
-        }
-      }
+async function tryShare({ url }) {
+  try {
+    const result = await Share.share({
+      url,
+      text: herePurchaseReceipt,
+      title: purchaseReceiptTitle,
+      dialogTitle: shareReceipt,
+    });
+    if (result.activityType) {
+      console.log("Share completed:", result.activityType);
     }
   } catch (error) {
-    console.error("PDF handling error:", error);
-    // Instead of showing error, try direct sharing of the HTML content
-    try {
-      await Share.share({
-        title: "Purchase Receipt",
-        text: "Here is your purchase receipt",
-        url: printElement,
-        dialogTitle: "Share Receipt",
-      });
-    } catch (shareError) {
-      if (shareError.message !== "Share canceled") {
-        console.error("Share fallback error:", shareError);
-      }
+    if (error.message !== shareCanceled) {
+      throw error;
     }
-  } finally {
-    // Reset sharing flag after a short delay to prevent immediate re-triggers
-    setTimeout(() => {
-      window._isSharing = false;
-    }, 500);
+  }
+}
+
+async function cleanupFile(fileName) {
+  try {
+    await Filesystem.deleteFile({
+      path: fileName,
+      directory: Directory.Cache,
+    });
+  } catch (err) {
+    console.log("Cleanup error (non-critical):", err);
+  }
+}
+
+async function tryDirectHtmlShare(htmlContent) {
+  try {
+    await Share.share({
+      title: purchaseReceiptTitle,
+      text: herePurchaseReceipt,
+      url: htmlContent,
+      dialogTitle: shareReceipt,
+    });
+  } catch (err) {
+    if (err.message !== shareCanceled) {
+      console.error("Share fallback error:", err);
+    }
   }
 }
 
@@ -313,16 +291,17 @@ const OrdersCard = ({
     const currentDate = new Date();
     const timeDiff = currentDate - createdDate;
     const oneDay = 24 * 60 * 60 * 1000; // 1 day in milliseconds
-    const threeDays = 6 * oneDay; // 6 days in milliseconds
+    const fifteenDays = 15 * oneDay; // 15 days in milliseconds
 
     if (title === quoteSaved) {
-      return timeDiff > oneDay;
+      return timeDiff > fifteenDays;
     } else if (title === "Order Saved") {
-      return timeDiff > threeDays;
+      return timeDiff > fifteenDays;
     } else {
       return false;
     }
   };
+
   const handleInitiate = () => {
     if (isExpired()) {
       return;
@@ -418,9 +397,9 @@ const OrdersCard = ({
       </div>
 
       <div className="flex items-center gap-2 p-2 border-b-2 border-gray-300 border-dashed">
-        <div className="w-[20%]">
+        <div className="w-[20%] max-h-[80px] flex items-center">
           <img
-            className="w-[100%] h-[60px]"
+            className="w-full h-auto max-h-[80px] object-contain"
             src={deviceSelected === "Watch" ? watch : phonePhoto}
             alt="device image"
           />

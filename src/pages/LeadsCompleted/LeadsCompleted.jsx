@@ -15,6 +15,7 @@ import { IoRefresh } from "react-icons/io5";
 import ReactDOMServer from "react-dom/server";
 import html2pdf from "html2pdf.js";
 import PurchaseReceipt from "../../components/PurchaseReceipt";
+import { fetchSignatureAsBase64 } from "../../utils/fetchSignatureAsBase64";
 const pageLimit = 10;
 const ALLstore = "All Stores";
 const iniDate = "2023-01-01";
@@ -24,8 +25,9 @@ const getStore = async () => {
   const token = sessionStorage.getItem("authToken");
   const config = {
     method: "get",
-    url: `${import.meta.env.VITE_REACT_APP_ENDPOINT
-      }/api/store/findAll?page=0&limit=9999`,
+    url: `${
+      import.meta.env.VITE_REACT_APP_ENDPOINT
+    }/api/store/findAll?page=0&limit=9999`,
     headers: { Authorization: token },
   };
   await axios
@@ -44,40 +46,79 @@ const getStore = async () => {
   return storeNamesArray;
 };
 
+// Extracted helper function to process QNA data
+const processQNAData = (qnaArray) => {
+  const questionData = {};
+  let index = 1;
+
+  if (!qnaArray?.[0] || typeof qnaArray[0] !== "object") {
+    return questionData;
+  }
+
+  for (const group in qnaArray[0]) {
+    if (Array.isArray(qnaArray[0][group])) {
+      qnaArray[0][group].forEach((qna) => {
+        questionData[`Q${index}. ${qna?.quetion}`] = qna?.key;
+        index++;
+      });
+    }
+  }
+
+  return questionData;
+};
+
+// Extracted helper function to process device report
+const processDeviceReport = (deviceReport) => {
+  if (!deviceReport || typeof deviceReport !== "object") {
+    return "N/A";
+  }
+
+  const selectedIssues = Object.entries(deviceReport)
+    .filter(
+      ([key, value]) => value === true || value === "Yes" || value === "true"
+    )
+    .map(([key]) => key);
+
+  return selectedIssues.length > 0 ? selectedIssues.join(", ") : "No Issues";
+};
+
+// Extracted helper function to get variant info
+const getVariantInfo = (val) => {
+  if (val?.modelId?.type === "CTG1") {
+    return `${
+      val?.storage && val?.ram ? `${val?.ram}/${val?.storage}` : val?.storage
+    }`;
+  }
+  return "-";
+};
+
+// Refactored main function with reduced complexity
 const downloadExcelLeadsompleted = (apiData) => {
   const fileType =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
   const fileExtension = ".xlsx";
 
   const formattedData = apiData.map((item) => {
-    const questionData = {};
-    let index = 1;
-
-    if (item?.QNA?.[0] && typeof item.QNA[0] === 'object') {
-      for (const group in item.QNA[0]) {
-        // Check if item.QNA[0][group] is an array before calling forEach
-        if (Array.isArray(item.QNA[0][group])) {
-          item.QNA[0][group].forEach((qna) => {
-            // Create a column for each question with its answer
-            questionData[`Q${index}. ${qna?.quetion}`] = qna?.key;
-            index++;
-          });
-        }
-      }
-    }
+    const questionData = processQNAData(item?.QNA);
+    const deviceReportSummary = processDeviceReport(item.deviceReport);
 
     return {
       "Date Created": new Date(item?.updatedAt).toLocaleDateString("en-IN"),
+      "Company Name":
+        item.companyId?.name || item.store?.companyId?.name || "N/A",
+      "Purchase Grade": item.purchaseGrade || "N/A",
       "Store user Mobile No.": item.phoneNumber,
       "User Email": item.userId?.email,
       "Customer Mobile No.": item.phoneNumber,
       "Customer Name": item.name,
       Product: item.modelId?.name,
+      Variant: getVariantInfo(item),
+      "Device Issues": deviceReportSummary,
       Price: item.actualPrice,
       "Final Price Offered to Customer": item?.price,
       "Order Id": item?.uniqueCode,
       "IMEI No.": item.documentId?.IMEI,
-      ...questionData, // Spread the questionData to include in the final object
+      ...questionData,
     };
   });
 
@@ -101,6 +142,7 @@ const LeadsCompleted = () => {
   const [deviceType, setDeviceType] = useState("CTG1");
   const userToken = sessionStorage.getItem("authToken");
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [sideMenu, setsideMenu] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [tableData, setTableData] = useState([]);
@@ -125,6 +167,7 @@ const LeadsCompleted = () => {
   const saveStore = async () => {
     const temparr = await getStore();
     setStoreData(temparr);
+    setFilteredStores(temparr);
   };
   useEffect(() => {
     saveStore();
@@ -139,14 +182,24 @@ const LeadsCompleted = () => {
         }
       );
       setCategories(data.data);
-    } catch (err) {
-      console.log(err);
-    }
+    } catch (err) {}
   };
   function getSalesData() {
     setLoading(true);
-    const endpoint = `${import.meta.env.VITE_REACT_APP_ENDPOINT
-      }/api/prospects/findAllSelled?page=${currentPage}&limit=${pageLimit}&startDate=${fromDateDup}&endDate=${toDateDup}&store=${selStoreId}&rid=${search}&customerPhone=${search1}&deviceType=${deviceType}`;
+    const baseUrl = `${
+      import.meta.env.VITE_REACT_APP_ENDPOINT
+    }/api/prospects/findAllSelled`;
+    const queryParams = new URLSearchParams({
+      page: currentPage,
+      limit: pageLimit,
+      startDate: fromDateDup,
+      endDate: toDateDup,
+      store: selStoreId,
+      rid: search,
+      customerPhone: search1,
+      deviceType: deviceType,
+    });
+    const endpoint = `${baseUrl}?${queryParams.toString()}`;
     axios
       .get(endpoint, {
         headers: { authorization: userToken },
@@ -248,50 +301,53 @@ const LeadsCompleted = () => {
   };
 
   return (
-    <div>
-      <SubLeadsCompleted
-        loading={loading}
-        setsideMenu={setsideMenu}
-        sideMenu={sideMenu}
-        totalCount={totalCount}
-        fromDate={fromDate}
-        handleFromDateChange={handleFromDateChange}
-        toDate={toDate}
-        handleToDateChange={handleToDateChange}
-        tableData={tableData}
-        setCurrentPage={setCurrentPage}
-        currentPage={currentPage}
-        maxPages={maxPages}
-        search={search}
-        setSearch={setSearch}
-        search1={search1}
-        setSearch1={setSearch1}
-        storeDrop={storeDrop}
-        setStoreDrop={setStoreDrop}
-        storeName={storeName}
-        storeData={storeData}
-        handleSearchClear={handleSearchClear}
-        handleStoreChange={handleStoreChange}
-        getSalesData={getSalesData}
-        deviceType={deviceType}
-        setDeviceType={setDeviceType}
-        selStoreId={selStoreId}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        handleSearch={handleSearch}
-        filteredStores={filteredStores}
-        categories={categories}
-      />
-    </div>
+    <SubLeadsCompleted
+      loading={loading}
+      downloading={downloading}
+      setDownloading={setDownloading}
+      setsideMenu={setsideMenu}
+      sideMenu={sideMenu}
+      totalCount={totalCount}
+      fromDate={fromDate}
+      handleFromDateChange={handleFromDateChange}
+      toDate={toDate}
+      handleToDateChange={handleToDateChange}
+      tableData={tableData}
+      setCurrentPage={setCurrentPage}
+      currentPage={currentPage}
+      maxPages={maxPages}
+      search={search}
+      setSearch={setSearch}
+      search1={search1}
+      setSearch1={setSearch1}
+      storeDrop={storeDrop}
+      setStoreDrop={setStoreDrop}
+      storeName={storeName}
+      storeData={storeData}
+      handleSearchClear={handleSearchClear}
+      handleStoreChange={handleStoreChange}
+      getSalesData={getSalesData}
+      deviceType={deviceType}
+      setDeviceType={setDeviceType}
+      selStoreId={selStoreId}
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      handleSearch={handleSearch}
+      filteredStores={filteredStores}
+      categories={categories}
+    />
   );
 };
 
-const fetchDownloadData = (totalCount, deviceType, Str) => {
+const fetchDownloadData = (totalCount, deviceType, Str, setDownloading) => {
   const userToken1 = sessionStorage.getItem("authToken");
+  setDownloading(true);
   axios
     .get(
-      `${import.meta.env.VITE_REACT_APP_ENDPOINT
-      }/api/prospects/findAllSelled?page=${0}&limit=${totalCount}&deviceType=${deviceType}&startDate=2020-01-01&toDate=${new Date().toISOString().split("T")[0]
+      `${
+        import.meta.env.VITE_REACT_APP_ENDPOINT
+      }/api/prospects/findAllSelled?page=${0}&limit=${totalCount}&deviceType=${deviceType}&startDate=2020-01-01&toDate=${
+        new Date().toISOString().split("T")[0]
       }&store=${Str}`,
       {
         headers: {
@@ -301,14 +357,18 @@ const fetchDownloadData = (totalCount, deviceType, Str) => {
     )
     .then((res) => {
       downloadExcelLeadsompleted(res.data.data);
+      setDownloading(false);
     })
     .catch((err) => {
       console.log(err);
+      setDownloading(false);
     });
 };
 
 const SubLeadsCompleted = ({
   loading,
+  downloading,
+  setDownloading,
   setsideMenu,
   sideMenu,
   totalCount,
@@ -340,7 +400,6 @@ const SubLeadsCompleted = ({
   filteredStores,
   categories,
   ...props
-
 }) => {
   return (
     <div className="overflow-y-hidden">
@@ -375,7 +434,11 @@ const SubLeadsCompleted = ({
         setSearchTerm={setSearchTerm}
         setDeviceType={setDeviceType}
         categories={categories}
-        tableData={tableData} />
+        tableData={tableData}
+        storeData={storeData}
+        setDownloading={setDownloading}
+        downloading={downloading}
+      />
       <div className="flex gap-2 items-center justify-center outline-none mt-5 w-[100%]">
         <div className={`${styles.search_bar_wrap}`}>
           <input
@@ -406,20 +469,22 @@ const SubLeadsCompleted = ({
         <button
           onClick={() => setCurrentPage(currentPage - 1)}
           disabled={currentPage === 0}
-          className={`mx-2 px-4 py-2 rounded-lg ${currentPage === 0
-            ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-            : "bg-primary text-white cursor-pointer"
-            }`}
+          className={`mx-2 px-4 py-2 rounded-lg ${
+            currentPage === 0
+              ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+              : "bg-primary text-white cursor-pointer"
+          }`}
         >
           Previous
         </button>
         <button
           onClick={() => setCurrentPage(currentPage + 1)}
           disabled={currentPage === maxPages - 1}
-          className={`mx-2 px-4 py-2 rounded-lg ${currentPage === maxPages - 1
-            ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-            : "bg-primary text-white cursor-pointer"
-            }`}
+          className={`mx-2 px-4 py-2 rounded-lg ${
+            currentPage === maxPages - 1
+              ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+              : "bg-primary text-white cursor-pointer"
+          }`}
         >
           Next
         </button>
@@ -427,21 +492,46 @@ const SubLeadsCompleted = ({
     </div>
   );
 };
-const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, deviceType, selStoreId, toDate, handleToDateChange, setStoreDrop,
-  storeDrop, searchTerm, handleSearch, filteredStores, handleStoreChange, setSearchTerm, setDeviceType, categories, tableData, storeData }) => {
-
+const SubLeadsCompletedBtns = ({
+  handleFromDateChange,
+  fromDate,
+  totalCount,
+  deviceType,
+  selStoreId,
+  toDate,
+  handleToDateChange,
+  setStoreDrop,
+  storeDrop,
+  searchTerm,
+  handleSearch,
+  filteredStores,
+  handleStoreChange,
+  setSearchTerm,
+  setDeviceType,
+  categories,
+  tableData,
+  storeData,
+  setDownloading,
+  downloading,
+}) => {
   const handleBulkDownloadReceipts = () => {
     if (!fromDate || !toDate) {
       alert("Please select and search valid date range Leads.");
       return;
     }
-    tableData.forEach((item, index) => {
+
+    tableData.forEach(async (item, index) => {
       const dateString = item?.updatedAt;
       const formattedDate = new Date(dateString).toLocaleDateString("en-IN", {
         day: "numeric",
         month: "short",
         year: "numeric",
       });
+      const signatureUrl = item?.documentId?.signature;
+      const signatureBase64 = signatureUrl
+        ? await fetchSignatureAsBase64(signatureUrl)
+        : null;
+
       const printElement = ReactDOMServer.renderToString(
         <PurchaseReceipt
           phoneNumber={item?.phoneNumber}
@@ -458,6 +548,8 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
           storage={item?.storage}
           RAM={item?.ram}
           formattedDate={formattedDate}
+          price={item?.price}
+          signatureUrl={signatureBase64 || signatureUrl}
         />
       );
       html2pdf()
@@ -467,7 +559,7 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
           image: { type: "jpeg", quality: 0.98 },
           html2canvas: { scale: 2, logging: false },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"] }, // Ensure page breaks work
+          pagebreak: { mode: ["css", "legacy"] },
         })
         .from(printElement)
         .save();
@@ -480,10 +572,24 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
         <button
           className={`${styles.bulkdown_button}`}
           onClick={() =>
-            fetchDownloadData(totalCount, deviceType, selStoreId)
+            fetchDownloadData(
+              totalCount,
+              deviceType,
+              selStoreId,
+              setDownloading
+            )
           }
+          disabled={downloading}
         >
-          <FaDownload /> Bulk Download
+          {downloading ? (
+            <>
+              <BeatLoader color="white" size={8} /> Downloading...
+            </>
+          ) : (
+            <>
+              <FaDownload /> Bulk Download
+            </>
+          )}
         </button>
         <div className="mt-2 ml-4">
           <button
@@ -512,7 +618,7 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
           placeholderText="Select to date"
         />
       </div>
-      {storeData && storeData.length > 1 && (
+      {storeData && storeData.length > 0 && (
         <div className="w-[250px] relative">
           <div
             className={`${styless.filter_button}`}
@@ -535,6 +641,15 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
               <div
                 className={`overflow-y-scroll   max-h-[200px]   ${styless.filter_drop}`}
               >
+                <div
+                  className={`${styles.filter_option}`}
+                  onClick={() => {
+                    handleStoreChange({ _id: "", storeName: ALLstore });
+                    setSearchTerm(ALLstore);
+                  }}
+                >
+                  <p className=" truncate ">{ALLstore}</p>
+                </div>
                 {filteredStores.length > 0 ? (
                   filteredStores.map((item3, index) => (
                     <div
@@ -552,19 +667,11 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
                 ) : (
                   <p className="p-2 text-gray-500">No stores found</p>
                 )}
-                <div
-                  className={`${styles.filter_option}`}
-                  onClick={() => {
-                    handleStoreChange({ _id: "", storeName: ALLstore });
-                    setSearchTerm(ALLstore);
-                  }}
-                >
-                  <p className=" truncate ">{ALLstore}</p>
-                </div>
               </div>
             </div>
           )}
-        </div>)}
+        </div>
+      )}
       <div className="w-[250px] h-[35px] relative">
         <select
           name=""
@@ -585,7 +692,6 @@ const SubLeadsCompletedBtns = ({ handleFromDateChange, fromDate, totalCount, dev
           ))}
         </select>
       </div>
-
     </div>
   );
 };

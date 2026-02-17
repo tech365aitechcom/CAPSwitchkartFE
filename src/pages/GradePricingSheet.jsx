@@ -20,20 +20,39 @@ const downloadExcelGradePricingSheet = (apiData) => {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
   const fileExtension = ".xlsx";
   const formattedData = apiData.map((item) => {
-    return {
+    const baseData = {
       "More Details": item.model?.name,
-      "A+(0.00%)": item.grades?.A_PLUS,
-      "A(10.00%)": item.grades?.A,
-      "B(15.00%)": item.grades?.B,
-      "B-(20.00%)": item.grades?.B_MINUS,
-      "C+(40.00%)": item.grades?.C_PLUS,
-      "C(50.00%)": item.grades?.C,
-      "C-(60.00%)": item.grades?.C_MINUS,
-      "D+(65.00%)": item.grades?.D_PLUS,
-      "D(70.00%)": item.grades?.D,
-      "D-(70.00%)": item.grades?.D_MINUS,
-      "E(90.00%)": item.grades?.E,
+      "A+WARRANTY": item.grades?.A_PLUS,
+      "A": item.grades?.A,
+      "B": item.grades?.B,
+      "B-": item.grades?.B_MINUS,
+      "C+": item.grades?.C_PLUS,
+      "C": item.grades?.C,
+      "C-": item.grades?.C_MINUS,
+      "D+": item.grades?.D_PLUS,
+      "D": item.grades?.D,
+      "D-": item.grades?.D_MINUS,
+      "E": item.grades?.E,
     };
+
+    // Add new format grades if they exist
+    if (item.grades?.A_MINUS !== undefined) {
+      baseData["A-"] = item.grades.A_MINUS;
+    }
+    if (item.grades?.A_MINUS_LIMITED !== undefined) {
+      baseData["A-Limited"] = item.grades.A_MINUS_LIMITED;
+    }
+    if (item.grades?.B_PLUS !== undefined) {
+      baseData["B+"] = item.grades.B_PLUS;
+    }
+    if (item.grades?.B_MINUS_LIMITED !== undefined) {
+      baseData["B-Limited"] = item.grades.B_MINUS_LIMITED;
+    }
+    if (item.grades?.C_MINUS_LIMITED !== undefined) {
+      baseData["C-Limited"] = item.grades.C_MINUS_LIMITED;
+    }
+
+    return baseData;
   });
   const wsGradePricingSheet = XLSX.utils.json_to_sheet(formattedData);
   const wbGradePricingSheet = {
@@ -68,6 +87,7 @@ const GradePricingSheet = () => {
   const [deviceCategory, setDeviceCategory] = useState("CTG1");
   const [file, setFile] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [dialogCategories, setDialogCategories] = useState([]);
 
   const fetchData = () => {
     setIsTableLoading(true);
@@ -176,8 +196,8 @@ const GradePricingSheet = () => {
     e.preventDefault();
     const token = sessionStorage.getItem("authToken");
     const formData = new FormData();
-    formData.append("file", file); //deviceCategory
-    formData.append("category", deviceCategory);
+    formData.append("file", file);
+    formData.append("category", dialogCategories);
 
     axios
       .post(
@@ -208,6 +228,9 @@ const GradePricingSheet = () => {
   const handleDeviceCategory = (e) => {
     setDeviceCategory(e.target.value);
   };
+     const handleUploadDeviceCategory = (e) => {
+     setDialogCategories(e.target.value);
+   };
   return (
     <div>
       <GradePricingSheetSub
@@ -229,6 +252,7 @@ const GradePricingSheet = () => {
         tableData={tableData}
         setCurrentPage={setCurrentPage}
         currentPage={currentPage}
+        handleUploadDeviceCategory={handleUploadDeviceCategory}
         maxPages={maxPages}
         categories={categories}
       />
@@ -254,6 +278,7 @@ const GradePricingSheetSub = ({
   deviceCategory,
   tableData,
   setCurrentPage,
+  handleUploadDeviceCategory,
   currentPage,
   maxPages,
   categories
@@ -279,6 +304,25 @@ const GradePricingSheetSub = ({
         <div className="fixed top-0 left-0 z-48 flex items-center justify-center w-full h-full bg-black bg-opacity-50">
           <div className={`${styles.err_mod_box} `}>
             <form className="flex flex-col gap-4" onSubmit={handleBulkSubmit}>
+              <div className="flex gap-2">
+              <p className="font-medium">Select Category</p>
+              <select
+                name=""
+                id=""
+                className="bg-primary text-white rounded-lg outline-none px-2 py-1"
+                onChange={handleUploadDeviceCategory}
+              >
+                {categories.map((cat) => (
+                  <option
+                    className="bg-white text-primary font-medium"
+                    key={cat?._id}
+                    value={cat?.categoryCode}
+                  >
+                    {cat?.categoryName}
+                  </option>
+                ))}
+              </select>
+            </div>
               <div className="flex flex-col">
                 <p className="mb-1 text-lg items-start text-slate-500">
                   Upload Grade Price Sheet

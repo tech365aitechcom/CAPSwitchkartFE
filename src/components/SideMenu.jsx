@@ -1,224 +1,178 @@
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom'
+import axiosInstance from '../utils/axiosInterceptor'
+import { USER_ROLES } from '../constants/roleConstants'
+import { useEffect, useState } from 'react'
+import axios from 'axios'
 
-function SideMenu({ setsideMenu, sideMenu }) {
-  const navigate = useNavigate();
+const useNavigationHandlers = (setsideMenu, sideMenu, profile) => {
+  const navigate = useNavigate()
 
-  const profile = JSON.parse(sessionStorage.getItem("profile"));
+  const createNavigationHandler = (path) => () => {
+    setsideMenu(!sideMenu)
+    navigate(path)
+  }
 
   const handleHome = () => {
-    setsideMenu(!sideMenu);
-    if (profile.role === "Super Admin") {
-      navigate("/adminmodels");
-    } else if (profile.role === "Admin Manager") {
-      navigate("/customertable");
-    } else if (profile.role === "Technician") {
-      navigate("/devicepickupdashboard");
+    setsideMenu(!sideMenu)
+    if (profile.role === USER_ROLES.SUPER_ADMIN) {
+      navigate('/adminmodels')
+    } else if (
+      profile.role === USER_ROLES.ADMIN_MANAGER ||
+      profile.role === USER_ROLES.COMPANY_ADMIN
+    ) {
+      navigate('/customertable')
+    } else if (profile.role === USER_ROLES.TECHNICIAN) {
+      navigate('/devicepickupdashboard')
     }
-  };
+  }
 
-  const handleTable = () => {
-    setsideMenu(!sideMenu);
-    navigate("/customertable");
-  };
+  const handleLogout = async () => {
+    try {
+      await axiosInstance.post('/api/userregistry/logout')
+    } catch (error) {
+      console.error('Logout API error:', error)
+    } finally {
+      localStorage.clear()
+      sessionStorage.clear()
+      navigate('/')
+    }
+  }
 
-  const handleGrade = () => {
-    setsideMenu(!sideMenu);
-    navigate("/gradepricingsheet");
-  };
-  const handleProfile = () => {
-    setsideMenu(!sideMenu);
-    navigate("/profile");
-  };
-
-  const handleRegister = () => {
-    setsideMenu(!sideMenu);
-    navigate("/registeruser");
-  };
-  const handleStoreListing = () => {
-    setsideMenu(!sideMenu);
-    navigate("/storelisting");
-  };
-  const handleCompanyListing = () => {
-    setsideMenu(!sideMenu);
-    navigate("/companylisting");
-  };
-  const handleTechnician = () => {
-    setsideMenu(!sideMenu);
-    navigate("/technicianwisereport");
-  };
-  const handleStoreReport = () => {
-    setsideMenu(!sideMenu);
-    navigate("/storewisereport");
-  };
-  const adminDashboard = () => {
-    setsideMenu(!sideMenu);
-    navigate("/admindashboard");
-  };
-
-  const handlpickup = () => {
-    setsideMenu(!sideMenu);
-    navigate("/devicepickupdashboard");
-  };
-
-  const handleBulkUploadHistory = () => {
-    setsideMenu(!sideMenu);
-    navigate("/bulkuploadhistory");
-  };
-
-  const handleQuoteTracking = () => {
-    setsideMenu(!sideMenu);
-    navigate("/quotetrackingdashboard");
-  };
-
-  const handleCreateCoupon = () => {
-    setsideMenu(!sideMenu);
-    navigate("/createcoupon");
-  };
-
-  const handleLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-
-    navigate("/");
-  };
-  return (
-    <>
-      {/* //new for change  */}
-      {(profile.role === "Super Admin" || profile.role === "Super_Admin_Unicorn") && (
-        <SuperAdminProfile
-          sideMenu={sideMenu}
-          handleHome={handleHome}
-          handleProfile={handleProfile}
-          handleGrade={handleGrade}
-          handleRegister={handleRegister}
-          handleStoreListing={handleStoreListing}
-          handleStoreReport={handleStoreReport}
-          handleTable={handleTable}
-          handleCompanyListing={handleCompanyListing}
-          handlpickup={handlpickup}
-          handleTechnician={handleTechnician}
-          adminDashboard={adminDashboard}
-          handleBulkUploadHistory={handleBulkUploadHistory}
-          handleQuoteTracking={handleQuoteTracking}
-          handleCreateCoupon={handleCreateCoupon}
-          handleLogout={handleLogout}
-        />
-      )}
-      {(profile.role === "Admin Manager" || profile.role === "Admin_Manager_Unicorn") && (
-        <div
-          className={
-            "menu fixed justify-center left-[-200px] top-0 w-[200px] h-full bg-slate-300 z-50 flex items-center transition-all duration-950 ease-in " +
-            (sideMenu && "left-[0]")
-          }
-        >
-          <ul className="list-none flex flex-col h-full pl-[6%] pt-[10%] justify-start gap-[2vh]">
-            <li
-              onClick={handleHome}
-              className="text-[20px] font-[300] cursor-pointer "
-            >
-              Home
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleProfile}
-            >
-              Profile
-            </li>
-            {/* <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleTable}
-            >
-              Customer Table
-            </li> */}
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleRegister}
-            >
-              Register User
-            </li>
-
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handlpickup}
-            >
-              Pickup & Cancel Device
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleStoreReport}
-            >
-              Store Report
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer"
-              onClick={handleQuoteTracking}
-            >
-              Quote Tracking
-            </li>
-
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleTechnician}
-            >
-              Technician Report
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={adminDashboard}
-            >
-              Admin Dashboard
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleLogout}
-            >
-              Logout
-            </li>
-          </ul>
-        </div>
-      )}
-      {profile.role === "Technician" && (
-        <div
-          className={
-            "menu fixed left-[-200px] top-0 w-[200px] h-full bg-slate-300 z-50 flex items-center justify-center transition-all duration-950 ease-in " +
-            (sideMenu && "left-[0]")
-          }
-        >
-          <ul className="list-none flex flex-col h-full pl-[6%] pt-[10%] justify-start gap-[2vh]">
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleHome}
-            >
-              Home
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleProfile}
-            >
-              Profile
-            </li>
-            <li
-              className="text-[20px] font-[300] cursor-pointer "
-              onClick={handleLogout}
-            >
-              Logout
-            </li>
-          </ul>
-        </div>
-      )}
-    </>
-  );
+  return {
+    handleHome,
+    handleTable: createNavigationHandler('/customertable'),
+    handleGrade: createNavigationHandler('/gradepricingsheet'),
+    handleProfile: createNavigationHandler('/profile'),
+    handleRegister: createNavigationHandler('/registeruser'),
+    handleStoreListing: createNavigationHandler('/storelisting'),
+    handleCompanyListing: createNavigationHandler('/companylisting'),
+    handleTechnician: createNavigationHandler('/technicianwisereport'),
+    handleStoreReport: createNavigationHandler('/storewisereport'),
+    adminDashboard: createNavigationHandler('/admindashboard'),
+    handlpickup: createNavigationHandler('/devicepickupdashboard'),
+    handleBulkUploadHistory: createNavigationHandler('/bulkuploadhistory'),
+    handleQuoteTracking: createNavigationHandler('/quotetrackingdashboard'),
+    handleCouponManagement: createNavigationHandler('/coupondetails'),
+    handleCreateCoupon: createNavigationHandler('/coupondetails'),
+    handleLogout,
+  }
 }
 
-export default SideMenu;
+function SideMenu({ setsideMenu, sideMenu }) {
+  const profile = JSON.parse(sessionStorage.getItem('profile'))
+
+  const [moduleConfig, setModuleConfig] = useState(
+    JSON.parse(sessionStorage.getItem('moduleConfig') || 'null'),
+  )
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('authToken')
+    if (!token) return
+    axios
+      .get(`${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/module/getModule`, {
+        headers: { Authorization: token },
+      })
+      .then((res) => {
+        sessionStorage.setItem('moduleConfig', JSON.stringify(res.data))
+        setModuleConfig(res.data)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handlers = useNavigationHandlers(setsideMenu, sideMenu, profile)
+
+  return (
+    <>
+      {(profile.role === USER_ROLES.SUPER_ADMIN ||
+        profile.role === USER_ROLES.COMPANY_ADMIN ||
+        profile.role === USER_ROLES.SUPER_ADMIN_UNICORN) && (
+        <SuperAdminProfile
+          sideMenu={sideMenu}
+          moduleConfig={moduleConfig}
+          profile={profile}
+          {...handlers}
+        />
+      )}
+      {(profile.role === USER_ROLES.ADMIN_MANAGER ||
+        profile.role === USER_ROLES.ADMIN_MANAGER_UNICORN) && (
+        <AdminManagerMenu sideMenu={sideMenu} {...handlers} />
+      )}
+      {profile.role === USER_ROLES.TECHNICIAN && (
+        <TechnicianMenu sideMenu={sideMenu} {...handlers} />
+      )}
+    </>
+  )
+}
+
+export default SideMenu
+
+const MenuItem = ({ onClick, children }) => (
+  <li className='text-[20px] font-[300] cursor-pointer' onClick={onClick}>
+    {children}
+  </li>
+)
+
+const AdminManagerMenu = ({
+  sideMenu,
+  handleHome,
+  handleProfile,
+  handleRegister,
+  handlpickup,
+  handleStoreReport,
+  handleQuoteTracking,
+  handleTechnician,
+  adminDashboard,
+  handleLogout,
+}) => (
+  <div
+    className={
+      'menu fixed justify-center left-[-200px] top-0 w-[200px] h-full bg-slate-300 z-50 flex items-center transition-all duration-950 ease-in ' +
+      (sideMenu && 'left-[0]')
+    }
+  >
+    <ul className='list-none flex flex-col h-full pl-[6%] pt-[10%] justify-start gap-[2vh]'>
+      <MenuItem onClick={handleHome}>Home</MenuItem>
+      <MenuItem onClick={handleProfile}>Profile</MenuItem>
+      <MenuItem onClick={handleRegister}>Register User</MenuItem>
+      <MenuItem onClick={handlpickup}>Pickup & Cancel Device</MenuItem>
+      <MenuItem onClick={handleStoreReport}>Store Report</MenuItem>
+      <MenuItem onClick={handleQuoteTracking}>Quote Tracking</MenuItem>
+      <MenuItem onClick={handleTechnician}>Technician Report</MenuItem>
+      <MenuItem onClick={adminDashboard}>Admin Dashboard</MenuItem>
+      <MenuItem onClick={handleLogout}>Logout</MenuItem>
+    </ul>
+  </div>
+)
+
+const TechnicianMenu = ({
+  sideMenu,
+  handleHome,
+  handleProfile,
+  handleLogout,
+}) => (
+  <div
+    className={
+      'menu fixed left-[-200px] top-0 w-[200px] h-full bg-slate-300 z-50 flex items-center justify-center transition-all duration-950 ease-in ' +
+      (sideMenu && 'left-[0]')
+    }
+  >
+    <ul className='list-none flex flex-col h-full pl-[6%] pt-[10%] justify-start gap-[2vh]'>
+      <MenuItem onClick={handleHome}>Home</MenuItem>
+      <MenuItem onClick={handleProfile}>Profile</MenuItem>
+      <MenuItem onClick={handleLogout}>Logout</MenuItem>
+    </ul>
+  </div>
+)
 
 const SuperAdminProfile = ({
   sideMenu,
+  moduleConfig,
+  profile,
   handleHome,
   handleProfile,
   handleGrade,
   handleRegister,
+  handleCreateCoupon,
   handleStoreListing,
   handleStoreReport,
   handleTable,
@@ -229,109 +183,61 @@ const SuperAdminProfile = ({
   handleLogout,
   handleBulkUploadHistory,
   handleQuoteTracking,
-  handleCreateCoupon,
 }) => {
+  // If no moduleConfig, default all to true (show everything)
+  const m = moduleConfig || {}
+  const show = (key) => m[key] !== false
+
   return (
     <div
       className={
-        "menu fixed left-[-200px] top-0 w-[200px] h-full bg-slate-300 z-50 flex items-start justify-center transition-all duration-950 ease-in " +
-        (sideMenu && "left-[0]")
+        'menu fixed left-[-200px] top-0 w-[200px] h-full bg-slate-300 z-50 flex items-start justify-center transition-all duration-950 ease-in ' +
+        (sideMenu && 'left-[0]')
       }
     >
-      <ul className="list-none flex flex-col h-full pl-[6%] pt-[10%] justify-start gap-[2vh]">
-        <li
-          className="text-[20px] font-[300] cursor-pointer"
-          onClick={handleHome}
-        >
-          Home
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer  "
-          onClick={handleProfile}
-        >
-          Profile
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleGrade}
-        >
-          Grade Pricing
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleRegister}
-        >
-          Register User
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleCreateCoupon}
-        >
-          Create Coupon
-        </li>
-
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleBulkUploadHistory}
-        >
-          Bulk Upload History
-        </li>
-
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleStoreListing}
-        >
-          Store Listing
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleStoreReport}
-        >
-          Store Report
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer"
-          onClick={handleQuoteTracking}
-        >
-          Quote Tracking
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleTable}
-        >
-          Customer Table
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleCompanyListing}
-        >
-          Company Listing
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handlpickup}
-        >
-          Pickup & Cancel Device
-        </li>
-        <li
-          onClick={handleTechnician}
-          className="text-[20px] cursor-pointer font-[300] "
-        >
-          Technician Report
-        </li>
-        <li
-          className="font-[300] cursor-pointer text-[20px] "
-          onClick={adminDashboard}
-        >
-          Admin Dashboard
-        </li>
-        <li
-          className="text-[20px] font-[300] cursor-pointer "
-          onClick={handleLogout}
-        >
-          Logout
-        </li>
+      <ul className='list-none flex flex-col h-full pl-[6%] pt-[10%] justify-start gap-[2vh]'>
+        {show('adminModels') && (
+          <MenuItem onClick={handleHome}>Home</MenuItem>
+        )}
+        <MenuItem onClick={handleProfile}>Profile</MenuItem>
+        {show('gradePricing') && (
+          <MenuItem onClick={handleGrade}>Grade Pricing</MenuItem>
+        )}
+        {show('registerUser') && (
+          <MenuItem onClick={handleRegister}>Register User</MenuItem>
+        )}
+        {show('createCoupon') && (
+          <MenuItem onClick={handleCreateCoupon}>Create Coupon</MenuItem>
+        )}
+        {show('bulkUploadHistory') && (
+          <MenuItem onClick={handleBulkUploadHistory}>Bulk Upload History</MenuItem>
+        )}
+        {show('storeListing') && (
+          <MenuItem onClick={handleStoreListing}>Store Listing</MenuItem>
+        )}
+        {show('storeReport') && (
+          <MenuItem onClick={handleStoreReport}>Store Report</MenuItem>
+        )}
+        {show('quoteTracking') && (
+          <MenuItem onClick={handleQuoteTracking}>Quote Tracking</MenuItem>
+        )}
+        {show('customerTable') && (
+          <MenuItem onClick={handleTable}>Customer Table</MenuItem>
+        )}
+        {show('companyListing') && (
+          <MenuItem onClick={handleCompanyListing}>Company Listing</MenuItem>
+        )}
+        {show('pickupCancelDevice') && (
+          <MenuItem onClick={handlpickup}>Pickup & Cancel Device</MenuItem>
+        )}
+        {show('technicianReport') && (
+          <MenuItem onClick={handleTechnician}>Technician Report</MenuItem>
+        )}
+        {show('adminDashboard') && (
+          <MenuItem onClick={adminDashboard}>Admin Dashboard</MenuItem>
+        )}
+        <MenuItem onClick={handleLogout}>Logout</MenuItem>
       </ul>
     </div>
-  );
-};
+  )
+}

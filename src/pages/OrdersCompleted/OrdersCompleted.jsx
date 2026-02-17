@@ -23,7 +23,7 @@ const OrdersCompleted = ({ daysfilters, head }) => {
   const [serachval, setSerachval] = useState("");
   const { fromDateDup, toDateDup } = useQuestionContext();
   const deviceType = sessionStorage.getItem("DeviceType");
-  const valDays = daysfilter;
+  const valDays = daysfilter === "custom" ? "" : daysfilter;
   const handleSeachSubmit = () => {
     setFlag(!flag);
   };
@@ -116,29 +116,38 @@ const OrdersCompleted = ({ daysfilters, head }) => {
       </div>
 
       <div className="flex flex-col gap-4 mt-4">
-        {newOrderCompletedData.map((item, index) => (
-          <OrdersCard
-            allData={item}
-            key={index}
-            itemData={item}
-            title={"Order Completed"}
-            customerName={item?.name}
-            customerEmail={item.lead?.emailId}
-            customerMobile={item?.phoneNumber}
-            deviceName={item?.model?.name}
-            savedBy={item.user?.name}
-            deviceRam={item.model?.config?.RAM}
-            deviceStorage={item.model?.config?.storage}
-            price={item.price}
-            quoteId={item.uniqueCode}
-            phonePhoto={
-              item.model?.phonePhotos?.front
-                ? item.model?.phonePhotos?.front
-                : "https://grest-c2b-images.s3.ap-south-1.amazonaws.com/gresTest/1705473080031front.jpg"
-            }
-            dateTime={item.updatedAt}
-          />
-        ))}
+        {newOrderCompletedData && newOrderCompletedData.length > 0 ? (
+          newOrderCompletedData.map((item, index) => (
+            <OrdersCard
+              allData={item}
+              key={index}
+              itemData={item}
+              title={"Order Completed"}
+              customerName={item?.name}
+              customerEmail={item.lead?.emailId}
+              customerMobile={item?.phoneNumber}
+              deviceName={item?.model?.name}
+              savedBy={item.user?.name}
+              deviceRam={item.model?.config?.RAM}
+              deviceStorage={item.model?.config?.storage}
+              price={item.price}
+              quoteId={item.uniqueCode}
+              phonePhoto={
+                item.model?.phonePhotos?.front
+                  ? item.model?.phonePhotos?.front
+                  : "https://grest-c2b-images.s3.ap-south-1.amazonaws.com/gresTest/1705473080031front.jpg"
+              }
+              dateTime={item.updatedAt}
+            />
+          ))
+        ) : (
+          !loading && (
+            <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-500">
+              <p className="text-lg font-medium">No completed orders found</p>
+              <p className="text-sm">Try adjusting your date filter or search criteria</p>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

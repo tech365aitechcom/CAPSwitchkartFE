@@ -14,7 +14,8 @@ body {
   /* padding-bottom: env(safe-area-inset-bottom); */
 }
 
-html,body{
+html,
+body {
   max-height: 100dvh;
 }
 

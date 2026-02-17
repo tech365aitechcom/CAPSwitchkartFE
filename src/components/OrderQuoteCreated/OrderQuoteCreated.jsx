@@ -23,7 +23,7 @@ const OrderQuoteCreated = ({ orderType, daysfilters, head }) => {
   const { fromDateDup, toDateDup } = useQuestionContext();
   const [serachval, setSerachval] = useState("");
   const deviceType = sessionStorage.getItem("DeviceType");
-  const valDays = daysfilter;
+  const valDays = daysfilter === "custom" ? "" : daysfilter;
   const location = useLocation();
   console.log("loc", location);
   const handleSeachSubmit = () => {
@@ -143,30 +143,41 @@ const OrderQuoteCreated = ({ orderType, daysfilters, head }) => {
       </div>
 
       <div className="flex flex-col gap-4 mt-4">
-        {data.map((item, index) => (
-          <OrdersCard
-            allData={item}
-            key={index}
-            itemData={item}
-            title={orderType === "quoteData" ? "Quote Saved" : "Order Saved"}
-            customerName={item.lead?.name}
-            customerEmail={item.lead?.emailId}
-            customerMobile={item.lead?.phoneNumber}
-            deviceName={item.lead?.model?.name}
-            savedBy={item.user?.name}
-            deviceRam={item.lead?.model?.config?.RAM}
-            deviceStorage={item.lead?.model?.config?.storage}
-            price={item.lead?.price}
-            quoteId={item.lead?.uniqueCode}
-            dateTime={item.updatedAt}
-            phonePhoto={
-              item.lead?.model?.phonePhotos?.front
-                ? item.lead?.model?.phonePhotos?.front
-                : "https://grest-c2b-images.s3.ap-south-1.amazonaws.com/gresTest/1705473080031front.jpg"
-            }
-            handleDelete={handleDelete}
-          />
-        ))}
+        {data && data.length > 0 ? (
+          data.map((item, index) => (
+            <OrdersCard
+              allData={item}
+              key={index}
+              itemData={item}
+              title={orderType === "quoteData" ? "Quote Saved" : "Order Saved"}
+              customerName={item.lead?.name}
+              customerEmail={item.lead?.emailId}
+              customerMobile={item.lead?.phoneNumber}
+              deviceName={item.lead?.model?.name}
+              savedBy={item.user?.name}
+              deviceRam={item.lead?.model?.config?.RAM}
+              deviceStorage={item.lead?.model?.config?.storage}
+              price={item.lead?.price}
+              quoteId={item.lead?.uniqueCode}
+              dateTime={item.updatedAt}
+              phonePhoto={
+                item.lead?.model?.phonePhotos?.front
+                  ? item.lead?.model?.phonePhotos?.front
+                  : "https://grest-c2b-images.s3.ap-south-1.amazonaws.com/gresTest/1705473080031front.jpg"
+              }
+              handleDelete={handleDelete}
+            />
+          ))
+        ) : (
+          !loading && (
+            <div className="flex flex-col items-center justify-center min-h-[300px] text-gray-500">
+              <p className="text-lg font-medium">
+                {orderType === "quoteData" ? "No quotes found" : "No orders found"}
+              </p>
+              <p className="text-sm">Try adjusting your date filter or search criteria</p>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

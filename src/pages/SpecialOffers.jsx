@@ -6,7 +6,6 @@ import { useQuestionContext } from "../components/QuestionContext";
 const currentDomain = window.location.origin;
 const DEFAULT_LOGO = "/Grest_Logo.jpg";
 const BUYBACK_LOGO = "/Grest_Logo_2.jpg"; // Use your actual buyback logo
-import { toast } from 'react-hot-toast';
 
 const isBuybackDomain = currentDomain === import.meta.env.VITE_BUYBACK_URL;
 const GREST_LOGO = isBuybackDomain ? BUYBACK_LOGO : DEFAULT_LOGO;
@@ -24,8 +23,9 @@ export const CouponCard = ({ title, code, hanldePermanenet, isSelected }) => {
   return (
     <div
       className={`bg-gradient-to-br from-[#f4bdcd]   max-w-[400px]
-       text-white rounded-md mx-4 px-2 py-4 ${isSelected ? "to-[#f70e4c]" : " to-[#dd6887]"
-        }
+       text-white rounded-md mx-4 px-2 py-4 ${
+         isSelected ? "to-[#f70e4c]" : " to-[#dd6887]"
+       }
       }
        `}
     >
@@ -59,8 +59,9 @@ export const DynamicCouponCard = ({
   return (
     <div
       className={`bg-gradient-to-br from-[#f4bdcd]   max-w-[400px]
-       text-white rounded-md mx-4 px-2 py-4 ${isSelected === discount ? "to-[#f70e4c]" : " to-[#dd6887]"
-        }
+       text-white rounded-md mx-4 px-2 py-4 ${
+         isSelected === discount ? "to-[#f70e4c]" : " to-[#dd6887]"
+       }
       }
        `}
     >
@@ -128,7 +129,9 @@ function hanldlejsx_pdf(leadData, setReceipt) {
     .from(printElement)
     .outputPdf("blob") // Get Blob output
     .then((blob) => {
-      const file = new File([blob], "Purchase_Receipt.pdf", { type: "application/pdf" });
+      const file = new File([blob], "Purchase_Receipt.pdf", {
+        type: "application/pdf",
+      });
       console.log("Generated PDF File:", file);
       setReceipt(file); // Store in state
     })
@@ -170,7 +173,8 @@ const SpecialOffers = () => {
   useEffect(() => {
     axios
       .get(
-        `${import.meta.env.VITE_REACT_APP_ENDPOINT
+        `${
+          import.meta.env.VITE_REACT_APP_ENDPOINT
         }/api/discounts/findByLeadId?leadId=${leadId}`,
         { headers: { authorization: userToken } }
       )
@@ -189,10 +193,11 @@ const SpecialOffers = () => {
     };
     axios
       .post(
-        `${import.meta.env.VITE_REACT_APP_ENDPOINT
+        `${
+          import.meta.env.VITE_REACT_APP_ENDPOINT
         }/api/discounts/applyDiscount`,
         finalPayload,
-        { headers: { authorization: userToken } }
+        { headers: { authorization: userToken, "X-Skip-Interceptor": "true" } }
       )
       .then((res) => {
         const newPrice = res.data.data.price + discountAvailable;
@@ -216,66 +221,19 @@ const SpecialOffers = () => {
     }
   };
 
-
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     setIsLoading(true);
     const userIdToken = sessionStorage.getItem("authToken");
-    const leadId = sessionStorage.getItem("LeadId");
-    const leadsubmitDATA = JSON.parse(sessionStorage.getItem("responsedatadata"));
-    const deviceModelData = JSON.parse(sessionStorage.getItem("dataModel"));
-    const eligibleCouponCode = sessionStorage.getItem("eligibleCouponCode");
-
-    if (leadsubmitDATA?.bonus > 0 && eligibleCouponCode) {
-      try {
-        const imei = deviceModelData?.imei;
-        if (!imei) throw new Error("IMEI not found. Cannot validate coupon.");
-        await axios.post(
-          `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/coupons/apply`,
-          {
-            leadId: leadId,
-            couponCode: eligibleCouponCode,
-            imei: imei,
-          },
-          {
-            headers: { Authorization: userIdToken },
-          }
-        );
-      } catch (error) {
-        const errorMessage = error.response?.data?.message || "An error occurred with the coupon validation.";
-        toast.error(
-          (t) => (
-            <span className="text-center">
-              <b> Coupon Error:</b> {errorMessage}
-              <br />
-              Please go back and remove the bonus.
-              <button
-                className="w-full mt-2 px-4 py-1 bg-primary text-white rounded-md text-sm"
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  navigate("/devicequote");
-                }}
-              >
-                Go Back
-              </button>
-            </span>
-          ),
-          {
-            duration: 10000,
-            onDismiss: () => navigate("/devicequote"),
-          }
-        );
-
-        setIsLoading(false);
-        return;
-      }
-    }
+    const LeadId = sessionStorage.getItem("LeadId");
     const formData = new FormData();
-    formData.append("id", leadId);
-    formData.append("bonusPrice", leadsubmitDATA.bonus);
-
+    formData.append("id", LeadId);
+    formData.append("bonusPrice", responseData.bonus);
+    formData.append("sellingPrice", Math.round(responseData.price));
     axios
       .post(
-        `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/questionnaires/item-purchased`,
+        `${
+          import.meta.env.VITE_REACT_APP_ENDPOINT
+        }/api/questionnaires/item-purchased`,
         formData,
         { headers: { Authorization: userIdToken } }
       )
@@ -368,9 +326,7 @@ const SubSpecialOffers = ({
               onClick={() => navigate(-1)}
               className="text-xs ml-2 flex items-center justify-center text-white bg-[--primary-color] hover:cursor-pointer p-2 rounded-full"
             >
-              <IoArrowBack
-                size={24}
-              />
+              <IoArrowBack size={24} />
             </button>
             <img
               onClick={() => navigate("/selectdevicetype")}
@@ -398,7 +354,7 @@ const SubSpecialOffers = ({
       </div>
       <div className="fixed bottom-0 flex flex-col w-full gap-2 p-4 bg-white border-t-2 ">
         <div className="flex justify-between text-lg font-medium">
-          <p className="text-xl">₹{Number(phonePrice)}</p>
+          <p className="text-xl">₹{Math.round(Number(phonePrice))}</p>
           <p
             onClick={handleViewSummary}
             className="text-primary cursor-pointer"

@@ -14,7 +14,6 @@ const Scanner = (props) => {
   const checkAndRequestPermissions = async () => {
     try {
       const permission = await Camera.checkPermissions();
-      
       if (permission.camera !== 'granted') {
         const request = await Camera.requestPermissions();
         if (request.camera !== 'granted') {
@@ -33,7 +32,9 @@ const Scanner = (props) => {
     try {
       if (isAndroid) {
         const hasPermission = await checkAndRequestPermissions();
-        if (!hasPermission) return;
+        if (!hasPermission){
+            return;
+          }
       }
 
       // Clean up any existing instance
@@ -169,8 +170,8 @@ const Scanner = (props) => {
     <React.Fragment>
       <div className={`my-auto ${styles.scan_page_wrap}`}>
         <div className={"flex flex-row gap-4 w-full items-center justify-center"}>
-          <button 
-            className="mb-2" 
+          <button
+            className="mb-2"
             onClick={() => {
               Quagga.stop();
               props.scanBoxSwitch();
@@ -183,7 +184,7 @@ const Scanner = (props) => {
         {error && (
           <div className="text-red-500 p-4 text-center">
             {error}
-            <button 
+            <button
               className="ml-2 text-blue-500 underline"
               onClick={retryScanner}
             >

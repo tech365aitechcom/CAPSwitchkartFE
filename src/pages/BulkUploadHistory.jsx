@@ -61,6 +61,103 @@ const BulkUploadHistory = () => {
     }
   }
 
+  let mainContent
+  if (loading) {
+    mainContent = (
+      <div className='flex justify-center items-center h-64'>
+        <BeatLoader color='var(--primary-color)' />
+      </div>
+    )
+  } else if (error) {
+    mainContent = (
+      <div className='text-center py-10 text-red-500 bg-red-50 rounded-lg'>
+        {error}
+      </div>
+    )
+  } else {
+    mainContent = (
+      <>
+        <div className='overflow-x-auto'>
+          <table className='w-full border border-primary'>
+            <thead className='bg-primary text-white'>
+              <tr>
+                <th className='p-2 text-sm md:p-3 md:text-base text-left'>
+                  File Name
+                </th>
+                <th className='p-2 text-sm md:p-3 md:text-base'>Category</th>
+                <th className='p-2 text-sm md:p-3 md:text-base'>Upload Date</th>
+                <th className='p-2 text-sm md:p-3 md:text-base'>Status</th>
+                <th className='p-2 text-sm md:p-3 md:text-base'>Succeeded</th>
+                <th className='p-2 text-sm md:p-3 md:text-base'>Rejected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((job, index) => {
+                const rowBg = index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                const rowClassName = `${rowBg} hover:bg-blue-50 cursor-pointer`
+                return (
+                  <tr
+                    key={job._id}
+                    className={rowClassName}
+                    onClick={() => handleRowClick(job)}
+                  >
+                    <td className='p-2 text-sm md:p-3 md:text-base'>
+                      {job.fileName}
+                    </td>
+                    <td className='p-2 text-sm text-center md:p-3 md:text-base'>
+                      {job.category}
+                    </td>
+                    <td className='p-2 text-sm text-center md:p-3 md:text-base'>
+                      {new Date(job.createdAt).toLocaleString('en-GB')}
+                    </td>
+                    <td className='p-2 text-sm text-center md:p-3 md:text-base'>
+                      {job.status}
+                    </td>
+                    <td className='p-2 text-sm text-center md:p-3 md:text-base text-green-600 font-semibold'>
+                      {job.succeeded}
+                    </td>
+                    <td className='p-2 text-sm text-center md:p-3 md:text-base text-red-600 font-semibold'>
+                      {job.failed}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {history.length === 0 && (
+            <p className='text-center py-8 text-gray-500'>
+              No upload history found.
+            </p>
+          )}
+        </div>
+
+        {pagination.totalRecords > 0 && pagination.totalPages > 1 && (
+          <div className='flex justify-between items-center mt-6'>
+            <span className='text-sm text-gray-600'>
+              Page {pagination.currentPage} of {pagination.totalPages}
+            </span>
+            <div className='flex gap-2'>
+              <button
+                onClick={() => handlePageChange(pagination.currentPage - 1)}
+                disabled={pagination.currentPage <= 1}
+                className='font-medium text-sm text-white p-2 rounded bg-primary disabled:bg-gray-400 disabled:cursor-not-allowed'
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(pagination.currentPage + 1)}
+                disabled={pagination.currentPage >= pagination.totalPages}
+                className='font-medium text-sm text-white py-2 px-4 rounded bg-primary disabled:bg-gray-400 disabled:cursor-not-allowed'
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className='min-h-screen pb-8 bg-[#F5F4F9]'>
       <AdminNavbar setsideMenu={setSideMenu} sideMenu={sideMenu} />
@@ -80,101 +177,7 @@ const BulkUploadHistory = () => {
           Bulk Upload History
         </h1>
 
-        {loading ? (
-          <div className='flex justify-center items-center h-64'>
-            <BeatLoader color='var(--primary-color)' />
-          </div>
-        ) : error ? (
-          <div className='text-center py-10 text-red-500 bg-red-50 rounded-lg'>
-            {error}
-          </div>
-        ) : (
-          <>
-            <div className='overflow-x-auto'>
-              <table className='w-full border border-primary'>
-                <thead className='bg-primary text-white'>
-                  <tr>
-                    <th className='p-2 text-sm md:p-3 md:text-base text-left'>
-                      File Name
-                    </th>
-                    <th className='p-2 text-sm md:p-3 md:text-base'>
-                      Category
-                    </th>
-                    <th className='p-2 text-sm md:p-3 md:text-base'>
-                      Upload Date
-                    </th>
-                    <th className='p-2 text-sm md:p-3 md:text-base'>Status</th>
-                    <th className='p-2 text-sm md:p-3 md:text-base'>
-                      Succeeded
-                    </th>
-                    <th className='p-2 text-sm md:p-3 md:text-base'>
-                      Rejected
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((job, index) => (
-                    <tr
-                      key={job._id}
-                      className={`${
-                        index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                      } hover:bg-blue-50 cursor-pointer`}
-                      onClick={() => handleRowClick(job)}
-                    >
-                      <td className='p-2 text-sm md:p-3 md:text-base'>
-                        {job.fileName}
-                      </td>
-                      <td className='p-2 text-sm text-center md:p-3 md:text-base'>
-                        {job.category}
-                      </td>
-                      <td className='p-2 text-sm text-center md:p-3 md:text-base'>
-                        {new Date(job.createdAt).toLocaleString('en-GB')}
-                      </td>
-                      <td className='p-2 text-sm text-center md:p-3 md:text-base'>
-                        {job.status}
-                      </td>
-                      <td className='p-2 text-sm text-center md:p-3 md:text-base text-green-600 font-semibold'>
-                        {job.succeeded}
-                      </td>
-                      <td className='p-2 text-sm text-center md:p-3 md:text-base text-red-600 font-semibold'>
-                        {job.failed}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {history.length === 0 && (
-                <p className='text-center py-8 text-gray-500'>
-                  No upload history found.
-                </p>
-              )}
-            </div>
-
-            {pagination.totalRecords > 0 && pagination.totalPages > 1 && (
-              <div className='flex justify-between items-center mt-6'>
-                <span className='text-sm text-gray-600'>
-                  Page {pagination.currentPage} of {pagination.totalPages}
-                </span>
-                <div className='flex gap-2'>
-                  <button
-                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                    disabled={pagination.currentPage <= 1}
-                    className='font-medium text-sm text-white p-2 rounded bg-primary disabled:bg-gray-400 disabled:cursor-not-allowed'
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                    disabled={pagination.currentPage >= pagination.totalPages}
-                    className='font-medium text-sm text-white py-2 px-4 rounded bg-primary disabled:bg-gray-400 disabled:cursor-not-allowed'
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        {mainContent}
       </div>
     </div>
   )

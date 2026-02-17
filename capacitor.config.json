@@ -1,6 +1,6 @@
 {
-  "appId": "www.fydox.in",
-  "appName": "SwitchKart",
+  "appId": "com.grest.ti.app",
+  "appName": "Grest",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

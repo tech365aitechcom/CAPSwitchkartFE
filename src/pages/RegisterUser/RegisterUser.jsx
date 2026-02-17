@@ -1,45 +1,16 @@
 import React, { useEffect, useState } from 'react'
-import styles from './RegisterUser.module.css'
 import { useNavigate } from 'react-router-dom'
-import AdminNavbar from '../../components/Admin_Navbar'
-import SideMenu from '../../components/SideMenu'
-import BulkUploadModal from '../../components/BulkUploadModal'
-
-import { BeatLoader } from 'react-spinners'
 import axios from 'axios'
-import { IoIosCheckmarkCircle, IoIosCloseCircle } from 'react-icons/io'
-import { IoEye, IoEyeOffSharp } from 'react-icons/io5'
+import { BeatLoader } from 'react-spinners'
+import AdminNavbar from '../../components/Admin_Navbar'
+import BulkUploadModal from '../../components/BulkUploadModal'
+import SideMenu from '../../components/SideMenu'
+import StatusModal from './StatusModal'
+import UserForm from './UserForm'
 
-const sucTextColor = 'text-green-500'
-const failTextColor = 'text-primary'
-const defaultRoles = ['Super Admin', 'Admin Manager', 'Technician']
-const role = import.meta.env.VITE_REACT_APP_ROLES
-  ? import.meta.env.VITE_REACT_APP_ROLES.split(',').map((item) => item.trim())
-  : defaultRoles
-const getStore = async () => {
-  const token1 = sessionStorage.getItem('authToken')
-  const config = {
-    method: 'get',
-    url: `${import.meta.env.VITE_REACT_APP_ENDPOINT
-      }/api/store/findAll?page=0&limit=9999`,
-    headers: { Authorization: token1 },
-  }
-  let storeNamesArray = []
-  await axios
-    .request(config)
-    .then((response) => {
-      console.log(response.data.result)
-      storeNamesArray = response.data.result.map((store) => ({
-        storeName: store.storeName,
-        _id: store._id,
-        region: store.region,
-      }))
-    })
-    .catch((error) => {
-      console.log(error)
-    })
-  return storeNamesArray
-}
+import { useStoreData } from './useStoreData'
+import { usePasswordValidation } from './usePasswordValidation'
+import { USER_ROLES } from '../../constants/roleConstants'
 
 const initForm = {
   firstName: '',
@@ -48,141 +19,217 @@ const initForm = {
   password: '',
   phoneNumber: '',
   role: '',
+  assignedStores: [],
   storeId: '',
   city: '',
   address: '',
+  companyId: '',
+}
+
+const applyCompanyForAdmin = (
+  isCompanyAdmin,
+  isAdminManager,
+  LoggedInUser,
+  setFormData
+) => {
+  if ((isCompanyAdmin || isAdminManager) && LoggedInUser?.companyId) {
+    setFormData((prev) => ({
+      ...prev,
+      companyId: LoggedInUser.companyId,
+    }))
+  }
+}
+
+const fetchCompaniesIfSuperAdmin = async (
+  isSuperAdmin,
+  token,
+  setCompanies
+) => {
+  if (!isSuperAdmin) {
+    return
+  }
+  const response = await axios.get(
+    `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/company/findAll`,
+    { headers: { Authorization: token } }
+  )
+  setCompanies(response.data.result || [])
+}
+
+const fetchStoresByCompanyId = async (companyId, token, setStores) => {
+  if (!companyId) {
+    setStores([])
+    return
+  }
+
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/store/findAll`,
+      {
+        headers: { Authorization: token },
+        params: { companyId },
+      }
+    )
+    setStores(response.data.result || [])
+  } catch {
+    setStores([])
+  }
+}
+
+const buildRegisterUserPayload = (formData, LoggedInUser, isCompanyAdmin) => {
+  const finalCompanyId = isCompanyAdmin
+    ? LoggedInUser.companyId
+    : formData.companyId
+
+  const payload = { ...formData, companyId: finalCompanyId }
+
+  if (
+    formData.role === USER_ROLES.ADMIN_MANAGER ||
+    formData.role === USER_ROLES.TECHNICIAN
+  ) {
+    delete payload.storeId
+  } else if (
+    formData.role === USER_ROLES.SUPER_ADMIN ||
+    formData.role === USER_ROLES.COMPANY_ADMIN
+  ) {
+    delete payload.storeId
+    delete payload.assignedStores
+  } else {
+    delete payload.assignedStores
+  }
+
+  return payload
 }
 
 const RegisterUser = () => {
   const token = sessionStorage.getItem('authToken')
-  const LoggedInUser = JSON.parse(sessionStorage.getItem("profile"));
-  const isSuperAdmin = LoggedInUser?.role === 'Super Admin';
-  const [sideMenu, setsideMenu] = useState(false)
-  const [isGrest, setIsGrest] = useState(null)
-  const [isTableLoaded, setIsTableLoaded] = useState(false)
-  const [errMsg, setErrMsg] = useState('')
-  const [sucBox, setSucBox] = useState(false)
-  const [failBox, setFailBox] = useState(false)
-  const [storeData, setStoreData] = useState([])
-  const [formData, setFormData] = useState(initForm)
-  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false)
+  const LoggedInUser = JSON.parse(sessionStorage.getItem('profile'))
+
+  const isSuperAdmin = LoggedInUser?.role === USER_ROLES.SUPER_ADMIN
+  const isCompanyAdmin = LoggedInUser?.role === USER_ROLES.COMPANY_ADMIN
+  const isAdminManager = LoggedInUser?.role === USER_ROLES.ADMIN_MANAGER
 
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const fetchAndSetStores = async () => {
-      setIsTableLoaded(true);
-      const stores = await getStore();
-      setStoreData(stores);
-      if (!isSuperAdmin && stores.length === 1) {
-        setFormData(prevData => ({ ...prevData, storeId: stores[0]._id }));
-      }
-      setIsTableLoaded(false);
-    };
+  const [sideMenu, setsideMenu] = useState(false)
+  const [isGrest, setIsGrest] = useState(null)
+  const [formData, setFormData] = useState(initForm)
+  const [modal, setModal] = useState({ open: false, success: false, msg: '' })
+  const [passwordValid, setPasswordValid] = useState(false)
+  const [companies, setCompanies] = useState([])
+  const [stores, setStores] = useState([])
 
-    fetchAndSetStores();
-  }, [isSuperAdmin]);
+  const { storeData, loading } = useStoreData(isSuperAdmin, setFormData)
+
+  const [errMsg, setErrMsg] = useState('')
+  usePasswordValidation(formData.password, setPasswordValid, setErrMsg)
+
+  useEffect(() => {
+    applyCompanyForAdmin(
+      isCompanyAdmin,
+      isAdminManager,
+      LoggedInUser,
+      setFormData
+    )
+  }, [isCompanyAdmin, isAdminManager, LoggedInUser])
+
+  useEffect(() => {
+    fetchCompaniesIfSuperAdmin(isSuperAdmin, token, setCompanies).catch(
+      console.error
+    )
+  }, [token, isSuperAdmin])
+
+  useEffect(() => {
+    fetchStoresByCompanyId(formData.companyId, token, setStores)
+  }, [formData.companyId, token])
+
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, grestMember: isGrest === 'yes' }))
+  }, [isGrest])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
-    const newValue = type === 'checkbox' ? checked : value
-    setFormData({
-      ...formData,
-      [name]: newValue,
-    })
+
+    if (name === 'role') {
+      setFormData({
+        ...formData,
+        [name]: type === 'checkbox' ? checked : value,
+        assignedStores: [],
+        storeId: '',
+      })
+    } else {
+      setFormData({
+        ...formData,
+        [name]: type === 'checkbox' ? checked : value,
+      })
+    }
   }
 
-  const submitHandler = (event) => {
+  const submitHandler = async (event) => {
     event.preventDefault()
-    setIsTableLoaded(true)
-    const data = {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      password: formData.password,
-      phoneNumber: formData.phoneNumber,
-      role: formData.role,
-      storeId: formData.storeId,
-      city: formData.city,
-      address: formData.address,
-    }
-    const config = {
-      method: 'post',
-      maxBodyLength: Infinity,
-      url: `${import.meta.env.VITE_REACT_APP_ENDPOINT
-        }/api/userregistry/register`,
-      headers: { Authorization: token },
-      data: data,
-    }
-    axios
-      .request(config)
-      .then((response) => {
-        setErrMsg('Successfully added new user')
-        setSucBox(true)
-        setIsTableLoaded(false)
-        navigate('/registeruserdetails')
+
+    if (!formData.companyId) {
+      setModal({
+        open: true,
+        success: false,
+        msg: 'Please select a company',
       })
-      .catch((error) => {
-        console.log(error)
-        setErrMsg('Failed to add new user, ' + error.response.data.msg)
-        setFailBox(true)
-        setIsTableLoaded(false)
+      return
+    }
+
+    try {
+      const payload = buildRegisterUserPayload(
+        formData,
+        LoggedInUser,
+        isCompanyAdmin
+      )
+
+      await axios.post(
+        `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/userregistry/register`,
+        payload,
+        { headers: { Authorization: token } }
+      )
+
+      setModal({
+        open: true,
+        success: true,
+        msg: 'Successfully added new user',
       })
+      navigate('/registeruserdetails')
+    } catch (error) {
+      setModal({
+        open: true,
+        success: false,
+        msg: error.response?.data?.msg || 'Failed to add new user',
+      })
+    }
   }
+
   return (
-    <div className='min-h-screen  pb-8 bg-[#F5F4F9]'>
+    <div className='min-h-screen pb-8 bg-[#F5F4F9]'>
       <div className='navbar'>
         <AdminNavbar setsideMenu={setsideMenu} sideMenu={sideMenu} />
         <SideMenu setsideMenu={setsideMenu} sideMenu={sideMenu} />
       </div>
+
       <BulkUploadModal
-        isOpen={isBulkUploadModalOpen}
-        onClose={() => setIsBulkUploadModalOpen(false)}
+        isOpen={modal.bulk}
+        onClose={() => setModal((m) => ({ ...m, bulk: false }))}
       />
-      {isTableLoaded && (
+
+      {loading && (
         <div className='fixed top-0 left-0 z-50 flex items-center justify-center w-full h-full bg-black bg-opacity-50'>
-          <BeatLoader
-            color='var(--primary-color)'
-            loading={isTableLoaded}
-            size={15}
-          />
+          <BeatLoader color='var(--primary-color)' size={15} />
         </div>
       )}
-      {(sucBox || failBox) && (
-        <div className='fixed top-0 left-0 z-50 flex items-center justify-center w-full h-full bg-black bg-opacity-50'>
-          <div
-            className={`${styles.err_mod_box} ${sucBox ? sucTextColor : failTextColor
-              }`}
-          >
-            {sucBox ? (
-              <IoIosCheckmarkCircle
-                className={sucBox ? sucTextColor : failTextColor}
-                size={90}
-              />
-            ) : (
-              <IoIosCloseCircle
-                className={sucBox ? sucTextColor : failTextColor}
-                size={90}
-              />
-            )}
-            <h6 className={sucBox ? sucTextColor : failTextColor}>
-              {sucBox ? 'Success!' : 'Error!'}
-            </h6>
-            <p className='text-slate-500'>{errMsg}</p>
-            <button
-              onClick={() => {
-                setSucBox(false)
-                setFailBox(false)
-              }}
-              className={
-                sucBox ? 'bg-green-500 text-white' : 'text-white bg-primary'
-              }
-            >
-              Okay
-            </button>
-          </div>
-        </div>
+
+      {modal.open && (
+        <StatusModal
+          success={modal.success}
+          message={modal.msg}
+          onClose={() => setModal({ open: false })}
+        />
       )}
+
       <div
         style={{
           boxShadow:
@@ -191,19 +238,19 @@ const RegisterUser = () => {
         className='items-center bg-white max-w-[900px] flex py-8 mx-auto mt-4 justify-center flex-col'
       >
         <div className='flex flex-col w-[900px]'>
-          <div className='mb-6  flex flex-col gap-2 border-b-2 pb-2 mr-10 ml-10'>
-            <div className='flex items-center gap-6 justify-centerflex-wrap'>
+          <div className='mb-6 flex flex-col gap-2 border-b-2 pb-2 mr-10 ml-10'>
+            <div className='flex items-center gap-6 justify-center flex-wrap'>
               <p className='text-4xl font-bold'>Register User</p>
               <button
-                onClick={() => setIsBulkUploadModalOpen(true)}
+                onClick={() => setModal((m) => ({ ...m, bulk: true }))}
                 className='font-medium text-sm text-white px-4 py-2 rounded bg-primary'
               >
                 Bulk Upload
               </button>
             </div>
-
-            <p className='text-lg '>All fields marked with * are required</p>
+            <p className='text-lg'>All fields marked with * are required</p>
           </div>
+
           <div className='flex flex-wrap gap-2 ml-10 mb-10'>
             <button
               onClick={() => navigate('/registeruserdetails')}
@@ -212,13 +259,21 @@ const RegisterUser = () => {
               View Details
             </button>
           </div>
+
           <UserForm
             formData={formData}
             submitHandler={submitHandler}
             handleChange={handleChange}
-            setIsGrest={setIsGrest}
             storeData={storeData}
             isSuperAdmin={isSuperAdmin}
+            isCompanyAdmin={isCompanyAdmin}
+            isAdminManager={isAdminManager}
+            errMsg={errMsg}
+            isValid={passwordValid}
+            setIsGrest={setIsGrest}
+            companies={companies}
+            stores={stores}
+            setFormData={setFormData}
           />
         </div>
       </div>
@@ -227,166 +282,3 @@ const RegisterUser = () => {
 }
 
 export default RegisterUser
-
-const UserForm = ({ formData, submitHandler, handleChange, storeData, isSuperAdmin }) => {
-  const [showUserPassword, setShowUserPassword] = useState(false)
-
-  return (
-    <form
-      className='ml-10 flex flex-col gap-4'
-      onSubmit={submitHandler}
-      autoComplete='off'
-    >
-      <label className='flex flex-col w-[70%] gap-2'>
-        <span className='font-medium text-xl'>First name*</span>
-        <input
-          name='firstName'
-          id='firstName'
-          placeholder='Enter first name'
-          value={formData.firstName}
-          onChange={handleChange}
-          className='border-2 px-2 py-2 rounded-lg outline-none'
-          type='text'
-          required
-        />
-      </label>
-      <label className='flex flex-col w-[70%] gap-2'>
-        <span className='font-medium text-xl'>Last name</span>
-        <input
-          name='lastName'
-          id='lastName'
-          placeholder='Enter last name'
-          value={formData.lastName}
-          onChange={handleChange}
-          className='border-2 px-2 py-2 rounded-lg outline-none'
-          type='text'
-        />
-      </label>
-      <label className='flex flex-col w-[70%] gap-2'>
-        <span className='font-medium text-xl'>Email*</span>
-        <input
-          name='email'
-          id='email'
-          minLength={6}
-          placeholder='Enter your email address'
-          value={formData.email || ''}
-          onChange={handleChange}
-          className='border-2 px-2 py-2 rounded-lg  outline-none '
-          type='email'
-          autoComplete='off'
-          required
-        />
-      </label>
-      <div>
-        <label className='font-medium text-xl' htmlFor='password'>
-          Password*
-        </label>
-        <div className='flex flex-col relative input w-[70%] gap-2'>
-          <input
-            name='password'
-            id='password'
-            minLength={6}
-            placeholder='Enter new password (min. 6 characters)'
-            value={formData.password || ''}
-            onChange={handleChange}
-            className='border-2 px-2 py-2 rounded-lg  outline-none '
-            type={showUserPassword ? 'text' : 'password'}
-            autoComplete='off'
-            required
-          />
-          <span
-            onClick={() => setShowUserPassword(!showUserPassword)}
-            className='absolute transform -translate-y-1/2 cursor-pointer right-2 top-6'
-          >
-            {!showUserPassword ? <IoEyeOffSharp /> : <IoEye />}
-          </span>
-        </div>
-      </div>
-      <label className='flex flex-col w-[70%] gap-2 '>
-        <span className='font-medium text-xl'>Mobile Number*</span>
-        <input
-          name='phoneNumber'
-          id='phoneNumber'
-          minLength={10}
-          placeholder='Enter 10-digit mobile number'
-          value={formData.phoneNumber}
-          onChange={handleChange}
-          className='border-2 px-2 py-2 rounded-lg  outline-none'
-          maxLength={10}
-          type='tel'
-          required
-        />
-      </label>
-      {isSuperAdmin && (
-        <label className='flex flex-col w-[70%] gap-2'>
-          <span className='font-medium text-xl'>Store Name*</span>
-          <select
-            name='storeId'
-            id='storeId'
-            value={formData.storeId}
-            className='outline-none text-base border-2 p-2 rounded-lg'
-            onChange={handleChange}
-            required
-          >
-            <option value=''> None </option>
-            {storeData.map((item) => (
-              <option key={item._id} value={item._id}>
-                {`${item.storeName}, ${item.region}`}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <label className='flex flex-col w-[70%] gap-2'>
-        <span className='font-medium text-xl'>Role*</span>
-        <select
-          id='role'
-          name='role'
-          value={formData.role}
-          className='outline-none text-base border-2 px-2 py-2 rounded-lg'
-          onChange={handleChange}
-          required
-        >
-          <option value=''>None</option>
-          {role.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className='flex flex-col w-[70%] gap-2'>
-        <span className='font-medium text-xl'>City</span>
-        <input
-          name='city'
-          id='city'
-          placeholder='Enter your city name'
-          value={formData.city}
-          onChange={handleChange}
-          className='border-2 px-2 py-2 rounded-lg  outline-none'
-          type='text'
-        />
-      </label>
-      <label className='flex flex-col w-[70%] gap-2'>
-        <span className='font-medium text-xl'>Adddress</span>
-        <input
-          name='address'
-          id='address'
-          placeholder='Enter your full address'
-          value={formData.address}
-          onChange={handleChange}
-          className='border-2 px-2 py-2 rounded-lg  outline-none'
-          type='text'
-        />
-      </label>
-      <div className='mt-8'>
-        <button
-          type='submit'
-          className='font-medium text-sm text-white p-3 rounded bg-primary'
-        >
-          Submit Form
-        </button>
-      </div>
-    </form>
-  )
-}

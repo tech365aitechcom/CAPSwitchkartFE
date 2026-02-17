@@ -77,7 +77,86 @@ const UploadHistoryDetailModal = ({ isOpen, onClose, uploadJob }) => {
     }
   }
 
-  if (!isOpen) return null
+  if (!isOpen) {
+    return null
+  }
+
+  let content
+  if (loading) {
+    content = (
+      <div className='flex justify-center items-center h-full'>
+        <BeatLoader color='var(--primary-color)' />
+      </div>
+    )
+  } else if (error) {
+    content = (
+      <div className='flex justify-center items-center h-full text-red-500'>
+        {error}
+      </div>
+    )
+  } else {
+    content = (
+      <div className='h-full overflow-y-auto border border-primary rounded-lg'>
+        <table className='w-full text-sm text-left'>
+          <thead className='bg-primary text-white sticky top-0 z-10'>
+            <tr>
+              <th className='p-2 md:p-3 font-medium'>Row</th>
+              <th className='p-2 md:p-3 font-medium'>Status</th>
+              {tableHeaders.map((header) => (
+                <th key={header} className='p-2 md:p-3 font-medium'>
+                  {header}
+                </th>
+              ))}
+              <th className='p-2 md:p-3 font-medium'>Error Message</th>
+            </tr>
+          </thead>
+          <tbody className='bg-white'>
+            {logDetails.map((log, index) => {
+              const statusClassMap = {
+                Success: 'bg-green-100 text-green-700',
+                Fail: 'bg-red-100 text-red-700',
+              }
+              const statusClass =
+                statusClassMap[log.status] || 'bg-gray-100 text-gray-600'
+              const errorMsg = log.errorMessage || '-'
+
+              return (
+                <tr
+                  key={log._id}
+                  className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}
+                >
+                  <td className='p-2 md:p-3 w-16 text-center'>
+                    {log.rowNumber}
+                  </td>
+                  <td className='p-2 md:p-3 w-24 text-center'>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${statusClass}`}
+                    >
+                      {log.status}
+                    </span>
+                  </td>
+                  {tableHeaders.map((header) => {
+                    const cellValue = log.rowData?.[header] ?? '-'
+                    return (
+                      <td
+                        key={`${log._id}-${header}`}
+                        className='p-2 md:p-3 truncate max-w-xs'
+                      >
+                        {cellValue}
+                      </td>
+                    )
+                  })}
+                  <td className='p-2 md:p-3 text-red-600 max-w-md'>
+                    {errorMsg}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4'>
@@ -130,68 +209,7 @@ const UploadHistoryDetailModal = ({ isOpen, onClose, uploadJob }) => {
           </div>
         )}
 
-        <div className='flex-grow overflow-hidden'>
-          {loading ? (
-            <div className='flex justify-center items-center h-full'>
-              <BeatLoader color='var(--primary-color)' />
-            </div>
-          ) : error ? (
-            <div className='flex justify-center items-center h-full text-red-500'>
-              {error}
-            </div>
-          ) : (
-            <div className='h-full overflow-y-auto border border-primary rounded-lg'>
-              <table className='w-full text-sm text-left'>
-                <thead className='bg-primary text-white sticky top-0 z-10'>
-                  <tr>
-                    <th className='p-2 md:p-3 font-medium'>Row</th>
-                    <th className='p-2 md:p-3 font-medium'>Status</th>
-                    {tableHeaders.map((header) => (
-                      <th key={header} className='p-2 md:p-3 font-medium'>
-                        {header}
-                      </th>
-                    ))}
-                    <th className='p-2 md:p-3 font-medium'>Error Message</th>
-                  </tr>
-                </thead>
-                <tbody className='bg-white'>
-                  {logDetails.map((log, index) => (
-                    <tr
-                      key={log._id}
-                      className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}
-                    >
-                      <td className='p-2 md:p-3 w-16 text-center'>
-                        {log.rowNumber}
-                      </td>
-                      <td className='p-2 md:p-3 w-24 text-center'>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            log.status === 'Success'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {log.status}
-                        </span>
-                      </td>
-                      {tableHeaders.map((header) => (
-                        <td
-                          key={`${log._id}-${header}`}
-                          className='p-2 md:p-3 truncate max-w-xs'
-                        >
-                          {log.rowData?.[header] ?? '-'}
-                        </td>
-                      ))}
-                      <td className='p-2 md:p-3 text-red-600 max-w-md'>
-                        {log.errorMessage || '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <div className='flex-grow overflow-hidden'>{content}</div>
       </div>
     </div>
   )

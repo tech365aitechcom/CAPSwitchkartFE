@@ -1,47 +1,25 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
 import { BeatLoader } from 'react-spinners'
-import { saveAs } from 'file-saver'
-import toast from 'react-hot-toast'
-
 import AdminNavbar from '../components/Admin_Navbar'
 import SideMenu from '../components/SideMenu'
 import QuoteTrackingTable from '../components/QuoteTrackingTable'
 import ActivityLogModal from '../components/QuickActivityLogModal'
-
 import { IoMdSearch } from 'react-icons/io'
 import { IoRefresh } from 'react-icons/io5'
-import {
-  FaDownload,
-  FaAngleDown,
-  FaCheckCircle,
-  FaExclamationTriangle,
-} from 'react-icons/fa'
-
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      ; ``
-      setDebouncedValue(value)
-    }, delay)
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-  return debouncedValue
-}
+import { FaDownload, FaAngleDown } from 'react-icons/fa'
+import useDebounce from '../hooks/useDebounce'
+import { handleDownloadReport } from '../utils/quoteDownload'
 
 const QuoteTrackingDashboard = () => {
   const [tableData, setTableData] = useState([])
   const [loading, setLoading] = useState(true)
   const [sideMenu, setSideMenu] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [storeData, setStoreData] = useState([]);
+
   const [filters, setFilters] = useState({
     search: '',
     dateRange: 'All Time',
-    storeId: "",
   })
 
   const [pagination, setPagination] = useState({
@@ -67,11 +45,11 @@ const QuoteTrackingDashboard = () => {
         limit: 10,
         dateRange: filters.dateRange,
         search: debouncedSearch,
-        storeId: filters.storeId,
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_REACT_APP_ENDPOINT
+        `${
+          import.meta.env.VITE_REACT_APP_ENDPOINT
         }/api/quoteTracking/dashboard`,
         {
           headers: { Authorization: token },
@@ -86,19 +64,11 @@ const QuoteTrackingDashboard = () => {
     } finally {
       setLoading(false)
     }
-  }, [pagination.currentPage, filters.dateRange, debouncedSearch, filters.storeId])
+  }, [pagination.currentPage, filters.dateRange, debouncedSearch])
 
   useEffect(() => {
     fetchTrackingData()
   }, [fetchTrackingData])
-
-  useEffect(() => {
-    const fetchStores = async () => {
-      const stores = await getStore();
-      setStoreData(stores);
-    };
-    fetchStores();
-  }, []);
 
   const handleFilterChange = (key, value) => {
     setPagination((prev) => ({ ...prev, currentPage: 1 }))
@@ -106,7 +76,7 @@ const QuoteTrackingDashboard = () => {
   }
 
   const handleRefresh = () => {
-    setFilters({ search: '', dateRange: 'All Time', storeId: "" })
+    setFilters({ search: '', dateRange: 'All Time' })
     if (pagination.currentPage !== 1) {
       setPagination((prev) => ({ ...prev, currentPage: 1 }))
     }
@@ -118,60 +88,18 @@ const QuoteTrackingDashboard = () => {
     }
 
     setIsDownloading(true)
-    const toastId = toast.loading(
-      <div className='flex items-center gap-2'>
-        <BeatLoader color='#3B82F6' size={8} />
-        <span>Generating your report...</span>
-      </div>
-    )
-
-    try {
-      const token = sessionStorage.getItem('authToken')
-      const response = await axios.get(
-        `${import.meta.env.VITE_REACT_APP_ENDPOINT
-        }/api/quoteTracking/dashboard/download`,
-        {
-          headers: { Authorization: token },
-          params: { dateRange: filters.dateRange, search: debouncedSearch, storeId: filters.storeId },
-          responseType: 'blob',
-        }
-      )
-
-      const blob = new Blob([response.data], { type: 'text/csv' })
-      saveAs(
-        blob,
-        `quote_tracking_report_${new Date().toISOString().split('T')[0]}.csv`
-      )
-
-      toast.success(
-        <div className='flex items-center gap-2'>
-          <FaCheckCircle className='text-green-500' />
-          <b>Report downloaded successfully!</b>
-        </div>,
-        { id: toastId }
-      )
-    } catch (error) {
-      console.error('Failed to download report:', error)
-
-      const errorMessage = (
-        <div className='flex items-center gap-2'>
-          <FaExclamationTriangle className='text-red-500' />
-          <b>
-            {error.response?.status === 404
-              ? 'Download failed: No data available.'
-              : 'An unexpected error occurred.'}
-          </b>
-        </div>
-      )
-
-      toast.error(errorMessage, { id: toastId })
-    } finally {
-      setIsDownloading(false)
-    }
+    const token = sessionStorage.getItem('authToken')
+    await handleDownloadReport({
+      token,
+      filters,
+      setIsDownloading,
+      debouncedSearch,
+      setToastIdRef: () => {},
+    })
   }
 
   const openActivityLog = (user) => {
-    setModalState({ isOpen: true, userId: user.userId, userName: user.email })
+    setModalState({ isOpen: true, userId: user.userId, userName: user.userId })
   }
 
   const closeActivityLog = () => {
@@ -225,8 +153,7 @@ const QuoteTrackingDashboard = () => {
         <button
           onClick={handleRefresh}
           title='Refresh Filters'
-          className='p-2.5 text-sm font-medium text-white bg-primary rounded-lg border border-gray-300 
-             transition-transform duration-150 ease-in-out active:scale-95'
+          className='p-2.5 text-sm font-medium text-white bg-primary rounded-lg border border-gray-300 transition-transform duration-150 ease-in-out active:scale-95'
         >
           <IoRefresh size={20} />
         </button>

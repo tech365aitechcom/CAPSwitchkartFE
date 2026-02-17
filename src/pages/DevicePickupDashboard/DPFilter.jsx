@@ -8,9 +8,16 @@ import { saveAs } from "file-saver";
 import { FaAngleDown, FaDownload } from "react-icons/fa6";
 import { useDispatch } from "react-redux";
 import { setStoreFilter } from "../../store/slices/userSlice";
+
 const PickupAvail = "Available For Pickup";
 const RotateCss = "rotate-180";
+
 const downloadExcel = (pendDataDown) => {
+  if (!pendDataDown || !Array.isArray(pendDataDown)) {
+    console.error("Invalid data provided for Excel download");
+    return;
+  }
+
   const fileType =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8";
   const fileExtension = ".xlsx";
@@ -33,7 +40,6 @@ const downloadExcel = (pendDataDown) => {
   const dataFile = new Blob([excelBuffer], { type: fileType });
   saveAs(dataFile, "Pending_Devices_Data" + fileExtension);
 };
-
 
 const DPFilter = ({
   setSearchValue,
@@ -62,25 +68,55 @@ const DPFilter = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredStores, setFilteredStores] = useState(storeData);
   const LoggedInUser = JSON.parse(sessionStorage.getItem("profile"));
-  const isSuperAdmin = LoggedInUser?.role === 'Super Admin';
+  const isSuperAdmin = LoggedInUser?.role === "Super Admin";
   const dispatch = useDispatch();
+
   const handleRegionChange = (value) => {
     setRegionDrop(false);
     setStoreName("");
-    const filteredStores1 = allStore.filter((store) => store.region === value);
-    const storeNamesArray = filteredStores1.map((store) => store.storeName);
-    setStoreData(storeNamesArray);
-    setRegion(value);
-    dispatch(setStoreFilter({ selStore: "", selRegion: value }));
+
+    if (value === "") {
+      // Logic for "All": Reset region and show all stores
+      setRegion("");
+      const allStoreNames = allStore.map((store) => store.storeName);
+      setStoreData(allStoreNames);
+      dispatch(setStoreFilter({ selStore: "", selRegion: "" }));
+    } else {
+      // Logic for Specific Region
+      const filteredStores1 = allStore.filter(
+        (store) => store.region === value
+      );
+      const storeNamesArray = filteredStores1.map((store) => store.storeName);
+      setStoreData(storeNamesArray);
+      setRegion(value);
+      dispatch(setStoreFilter({ selStore: "", selRegion: value }));
+    }
   };
+
   const handleStoreChange = (value) => {
     setStoreDrop(false);
-    const filteredStores2 = allStore?.filter((store) => store.storeName === value);
-    const newRegion = filteredStores2[0].region;
-    setRegion(newRegion);
-    setStoreName(value);
-    dispatch(setStoreFilter({ selStore: value, selRegion: newRegion }));
+
+    if (value === "") {
+      // Logic for "All": Reset store, region, and refill store list
+      setRegion("");
+      setStoreName("");
+      const allStoreNames = allStore.map((store) => store.storeName);
+      setStoreData(allStoreNames);
+      dispatch(setStoreFilter({ selStore: "", selRegion: "" }));
+    } else {
+      // Logic for Specific Store
+      const filteredStores2 = allStore?.filter(
+        (store) => store.storeName === value
+      );
+      if (filteredStores2?.length > 0) {
+        const newRegion = filteredStores2[0].region;
+        setRegion(newRegion);
+        setStoreName(value);
+        dispatch(setStoreFilter({ selStore: value, selRegion: newRegion }));
+      }
+    }
   };
+
   const handleSearchClear = () => {
     setSearchValue("");
     setSelectedStatus("");
@@ -89,6 +125,7 @@ const DPFilter = ({
     setStoreName(import.meta.env.VITE_USER_STORE_NAME);
     setSearchTerm("");
   };
+
   useEffect(() => {
     if (selectedStatus === "" && dateValue === "" && searchValue === "") {
       getData();
@@ -99,7 +136,8 @@ const DPFilter = ({
     if (storeDrop && searchTerm.trim() === "") {
       setFilteredStores(storeData);
     }
-  }, [storeDrop, searchTerm]);
+  }, [storeDrop, searchTerm, storeData]);
+
   const handleSearch = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
@@ -113,9 +151,11 @@ const DPFilter = ({
       setFilteredStores(filtered);
     }
   };
+
   const handleFilterClick = () => {
     setShowFilterDropdown(!showFilterDropdown);
   };
+
   const dateChangeHandler = (event) => {
     const formattedDate = new Date(event.target.value).toLocaleDateString(
       "en-GB"
@@ -166,77 +206,21 @@ const DPFilter = ({
         pendingTableData={pendingTableData}
       />
       {isSuperAdmin && (
-        <div className="flex gap-2 w-100 items-center outline-none">
-          <div className="relative w-[45%]">
-            <div
-              className={`w-[100%] ${styles.filter_button}`}
-              onClick={() => {
-                setRegionDrop(!regionDrop);
-              }}
-            >
-              <p className="truncate">
-                {region === "" ? "Select Region" : region}
-              </p>
-              <FaAngleDown size={17} className={`${regionDrop && RotateCss}`} />
-            </div>
-            {regionDrop && (
-              <div className={`w-[100%] ${styles.filter_drop}`}>
-                {regionData.map((item) => (
-                  <div
-                    key={item}
-                    onClick={() => handleRegionChange(item)}
-                    className={`${styles.filter_option}`}
-                  >
-                    <p className="truncate">{item}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="relative w-[70%]">
-            <div
-              className={`${styles.filter_button} w-full`}
-              onClick={() => setStoreDrop(!storeDrop)}
-            >
-              <p className="truncate">
-                {searchTerm === "" ? "Select Store" : searchTerm}
-              </p>
-              <FaAngleDown size={17} className={`${storeDrop && RotateCss}`} />
-            </div>
-            {storeDrop && (
-              <div className="absolute w-full bg-white shadow-md">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={handleSearch}
-                  className="w-full p-2 border-b border-gray-300"
-                  placeholder="Search store..."
-                />
-                <div
-                  className={`overflow-y-scroll max-h-[200px] ${styles.filter_drop} w-full`}
-                >
-                  {filteredStores.length > 0 ? (
-                    filteredStores.map((item, index) => (
-                      <div
-                        key={index}
-                        onClick={() => {
-                          handleStoreChange(item);
-                          setSearchTerm(item);
-                          setStoreDrop(false);
-                        }}
-                        className={`${styles.filter_option}`}
-                      >
-                        <p className="truncate">{item}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="p-2 text-gray-500">No stores found</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>)}
+        <SuperAdminFilters
+          region={region}
+          regionDrop={regionDrop}
+          setRegionDrop={setRegionDrop}
+          regionData={regionData}
+          handleRegionChange={handleRegionChange}
+          searchTerm={searchTerm}
+          storeDrop={storeDrop}
+          setStoreDrop={setStoreDrop}
+          handleSearch={handleSearch}
+          filteredStores={filteredStores}
+          handleStoreChange={handleStoreChange}
+          setSearchTerm={setSearchTerm}
+        />
+      )}
     </div>
   );
 };
@@ -271,6 +255,15 @@ const DPFilterSub = ({
               className={`${styles.filter_option}`}
             >
               <p>Available for Pickup</p>
+            </div>
+            <div
+              onClick={() => {
+                setStatusValue("Pending in QC");
+                handleFilterClick();
+              }}
+              className={`${styles.filter_option}`}
+            >
+              <p>Pending in QC</p>
             </div>
             <div
               onClick={() => {
@@ -312,3 +305,106 @@ const DPFilterSub = ({
   );
 };
 
+const SuperAdminFilters = ({
+  region,
+  regionDrop,
+  setRegionDrop,
+  regionData,
+  handleRegionChange,
+  searchTerm,
+  storeDrop,
+  setStoreDrop,
+  handleSearch,
+  filteredStores,
+  handleStoreChange,
+  setSearchTerm,
+}) => {
+  return (
+    <div className="flex gap-2 w-100 items-center outline-none">
+      <div className="relative w-[45%]">
+        <div
+          className={`w-[100%] ${styles.filter_button}`}
+          onClick={() => setRegionDrop(!regionDrop)}
+        >
+          {/* Label shows "All" if region is empty */}
+          <p className="truncate">{region === "" ? "All Region" : region}</p>
+          <FaAngleDown size={17} className={`${regionDrop && RotateCss}`} />
+        </div>
+        {regionDrop && (
+          <div className={`w-[100%] ${styles.filter_drop}`}>
+            {/* Added All option at the top */}
+            <div
+              onClick={() => handleRegionChange("")}
+              className={`${styles.filter_option}`}
+            >
+              <p className="truncate">All</p>
+            </div>
+            {regionData.map((item) => (
+              <div
+                key={item}
+                onClick={() => handleRegionChange(item)}
+                className={`${styles.filter_option}`}
+              >
+                <p className="truncate">{item}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="relative w-[70%]">
+        <div
+          className={`${styles.filter_button} w-full`}
+          onClick={() => setStoreDrop(!storeDrop)}
+        >
+          {/* Label shows "All" if searchTerm/storeName is empty */}
+          <p className="truncate">{searchTerm === "" ? "All Store" : searchTerm}</p>
+          <FaAngleDown size={17} className={`${storeDrop && RotateCss}`} />
+        </div>
+        {storeDrop && (
+          <div className="absolute w-full bg-white shadow-md">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearch}
+              className="w-full p-2 border-b border-gray-300"
+              placeholder="Search store..."
+            />
+            <div
+              className={`overflow-y-scroll max-h-[200px] ${styles.filter_drop} w-full`}
+            >
+              {/* Added All option at the top */}
+              <div
+                onClick={() => {
+                  handleStoreChange("");
+                  setSearchTerm("");
+                  setStoreDrop(false);
+                }}
+                className={`${styles.filter_option}`}
+              >
+                <p className="truncate">All</p>
+              </div>
+
+              {filteredStores.length > 0 ? (
+                filteredStores.map((item, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      handleStoreChange(item);
+                      setSearchTerm(item);
+                      setStoreDrop(false);
+                    }}
+                    className={`${styles.filter_option}`}
+                  >
+                    <p className="truncate">{item}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="p-2 text-gray-500">No stores found</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

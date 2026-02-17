@@ -55,21 +55,21 @@ const ContOTP = ({ setContinueOTPOpen }) => {
 
     const onSignup = async () => {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (otpData.name.length < 3) {
-        setErrMsg("Please enter a name with at least 3 characters.");
+      if (otpData.phone.length !== 10) {
+        setErrMsg("Mobile: (Must have 10 Digits)");
         return;
       }
       if (!emailRegex.test(otpData.email)) {
         setErrMsg("Invalid Email Format");
         return;
       }
-      if (otpData.phone.length !== 10) {
-        setErrMsg("Mobile: (Must have 10 Digits)");
+      if (otpData.name.length < 3) {
+        setErrMsg("Please enter a name with at least 3 characters.");
         return;
       }
 
-      setErrMsg("");
       setLoading(true);
+      setErrMsg("");
 
       try {
         await axios.post(`${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/sms/sendOtp`, {
@@ -78,26 +78,26 @@ const ContOTP = ({ setContinueOTPOpen }) => {
           headers: { Authorization: token },
         });
 
-        setOtpBoxOpen(true);
         setDisableResend(true);
+        setOtpBoxOpen(true);
       } catch (err) {
-        console.error(err);
         setErrMsg("Failed to send OTP");
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
     const onOTPVerify = async () => {
-      setLoading(true);
       const leadId = sessionStorage.getItem("LeadId");
+      setLoading(true);
 
       try {
         const res = await axios.post(
           `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/sms/verifyOtp`,
           {
-            mobileNumber: otpData.phone,
             otp,
+            mobileNumber: otpData.phone,
           },{
             headers: { Authorization: token },
           }
@@ -107,19 +107,19 @@ const ContOTP = ({ setContinueOTPOpen }) => {
           const response = await axios.post(
             `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/questionnaires/customerDetail`,
             {
-              name: otpData.name,
               emailId: otpData.email,
-              phoneNumber: otpData.phone,
+              name: otpData.name,
               leadId,
+              phoneNumber: otpData.phone,
             },{
               headers: { Authorization: token },
             }
           );
 
-          if (response?.status === 200) {
-            navigate("/thankyou");
-          } else {
+          if (response?.status !== 200) {
             setErrMsg("Failed to Save Details");
+          } else {
+            navigate("/thankyou");
           }
         } else {
           dispatch(setOtpVerified(true));
@@ -130,10 +130,10 @@ const ContOTP = ({ setContinueOTPOpen }) => {
         const isInvalidOtp =
           err.response?.status === 400 &&
           err.response?.data?.error === "Invalid OTP";
-        if (isInvalidOtp) {
-          toast.error("Invalid OTP. Please try again.");
-        } else {
+        if (!isInvalidOtp) {
           toast.error("Invalid or expired OTP");
+        } else {
+          toast.error("Invalid OTP. Please try again.");
         }
       } finally {
         setLoading(false);
@@ -142,7 +142,6 @@ const ContOTP = ({ setContinueOTPOpen }) => {
 
     const resendOTP = async () => {
       setDisableResend(true);
-
       try {
         await axios.post(`${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/sms/resendOtp`, {
           mobileNumber: otpData.phone,
@@ -150,8 +149,8 @@ const ContOTP = ({ setContinueOTPOpen }) => {
           headers: { Authorization: token },
         });
       } catch (err) {
-        console.error(err);
         setErrMsg("Failed to resend OTP");
+        console.error(err);
       }
     };
 

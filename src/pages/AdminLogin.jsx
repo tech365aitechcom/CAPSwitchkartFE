@@ -43,12 +43,21 @@ const AdminLogin = () => {
         email: userEmail,
         password: userPassword,
       })
-      .then((response) => {
+      .then(async (response) => {
         const { profile, authToken } = response.data;
         sessionStorage.setItem("authToken", authToken);
         sessionStorage.setItem("profile", JSON.stringify(profile));
         localStorage.removeItem("formData");
         dispatch(setUserProfile(profile));
+        try {
+          const moduleRes = await axios.get(
+            `${import.meta.env.VITE_REACT_APP_ENDPOINT}/api/module/getModule`,
+            { headers: { Authorization: authToken } }
+          );
+          sessionStorage.setItem("moduleConfig", JSON.stringify(moduleRes.data));
+        } catch (_) {
+          // non-fatal: sidebar will show all items if config is unavailable
+        }
         navigate("/adminhome");
       })
       .catch((err) => {

@@ -4,6 +4,7 @@ import User_Logo from "../../assets/User_Logo.jpg";
 import { IoClose } from "react-icons/io5";
 import styles from "./ProfileBox.module.css";
 import { GiHamburgerMenu } from "react-icons/gi";
+import axiosInstance from "../../utils/axiosInterceptor";
 
 function setName(firstName, lastName) {
   if (!firstName && !lastName) {
@@ -49,12 +50,22 @@ const ProfileBox = () => {
     setProfileOpen(!profileOpen);
   };
 
-  const logoutHandler = () => {
+  const logoutHandler = async () => {
     setProfileOpen(false);
-    localStorage.clear();
-    sessionStorage.clear();
-    setIsLoggedIn(false);
-    navigate("/");
+
+    try {
+      // Call backend logout endpoint to invalidate session
+      await axiosInstance.post('/api/userregistry/logout');
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with logout even if API call fails
+    } finally {
+      // Clear all client-side data
+      localStorage.clear();
+      sessionStorage.clear();
+      setIsLoggedIn(false);
+      navigate("/");
+    }
   };
 
   const handlePwdChange = () => {

@@ -1,4 +1,5 @@
-import React from "react";
+import CustomerFormDetails from "../CustomerFormDetails";
+import { useState } from "react";
 
 const PendingDevicesTable = ({
   pendingTableData,
@@ -7,7 +8,11 @@ const PendingDevicesTable = ({
   selectedRows,
   setSelectedData,
   setSelectedRows,
+  userRole,
 }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [QNAData, setQNAData] = useState([]);
+
   const handleCheckboxChange = (val, index) => {
     const newSelectedRows = [...selectedRows];
     const newSelectedData = [...selectedData];
@@ -42,6 +47,21 @@ const PendingDevicesTable = ({
       setSelectedIds(idsOfSelectedRows);
     }
   };
+
+  const handleDetailsClick = (leadData) => {
+    if (leadData?.QNA) {
+      setQNAData(leadData.QNA);
+      setShowModal(true);
+    } else {
+      alert("Details not available for this device.");
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setQNAData([]);
+  };
+
   return (
     <div className="m-2 overflow-x-auto md:m-5">
       <table className="w-full border border-primary">
@@ -81,6 +101,11 @@ const PendingDevicesTable = ({
             <th className="p-2 min-w-[100px] text-sm md:p-3 md:text-base">
               Reason
             </th>
+            {userRole === "Technician" && (
+              <th className="p-2 min-w-[100px] text-sm md:p-3 md:text-base">
+                More Details
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -100,10 +125,7 @@ const PendingDevicesTable = ({
                 {val?.modelName}
               </td>
               <td className="p-2 text-sm text-center md:p-3 md:text-base">
-                {
-                  val?.ramConfig.filter((i) => i.storage === val.storage)[0]
-                    ?.RAM
-                }
+                {val?.ram ? val.ram : ""}
               </td>
               <td className="p-2 text-sm text-center md:p-3 md:text-base">
                 {val?.storage ? val.storage : "512 GB"}
@@ -123,14 +145,41 @@ const PendingDevicesTable = ({
                 {val?.status}
               </td>
               <td className="p-2 text-sm text-center md:p-3 md:text-base">
-                {val?.status === "On Hold" || val?.status === "Cancelled"
+                {val?.status === "On Hold" ||
+                val?.status === "Cancelled" ||
+                val?.status === "QC Done" ||
+                val?.status === "Available For Pickup" ||
+                val?.status === "Pending in QC"
                   ? val?.reason
                   : ""}
               </td>
+              {/* Technician Column */}
+              {userRole === "Technician" && (
+                <td className="p-2 text-sm text-center md:p-3 md:text-base">
+                  <p
+                    onClick={() => handleDetailsClick(val)}
+                    className="cursor-pointer"
+                  >
+                    Details
+                  </p>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
       </table>
+      {showModal && (
+        <div className="z-50 fixed flex items-center inset-0 justify-center bg-black bg-opacity-50">
+          <div className="rounded w-96 p-4 bg-white relative mx-auto shadow-lg modal-container max-h-[90vh] overflow-y-auto">
+            <div className="modal-content">
+              <CustomerFormDetails
+                QNAData={QNAData}
+                closeModal={handleCloseModal}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
