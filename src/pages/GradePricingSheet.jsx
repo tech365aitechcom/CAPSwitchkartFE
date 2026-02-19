@@ -87,7 +87,7 @@ const GradePricingSheet = () => {
   const [deviceCategory, setDeviceCategory] = useState("CTG1");
   const [file, setFile] = useState(null);
   const [categories, setCategories] = useState([]);
-  const [dialogCategories, setDialogCategories] = useState([]);
+  const [dialogCategories, setDialogCategories] = useState("");
 
   const fetchData = () => {
     setIsTableLoading(true);
@@ -153,6 +153,10 @@ const GradePricingSheet = () => {
         }
       );
       setCategories(data.data);
+      if (data.data?.length > 0) {
+        setDeviceCategory(data.data[0].categoryCode);
+        setDialogCategories(data.data[0].categoryCode);
+      }
     } catch (err) {
       console.log(err);
     }
@@ -255,6 +259,7 @@ const GradePricingSheet = () => {
         handleUploadDeviceCategory={handleUploadDeviceCategory}
         maxPages={maxPages}
         categories={categories}
+        dialogCategories={dialogCategories}
       />
     </div>
   );
@@ -281,7 +286,8 @@ const GradePricingSheetSub = ({
   handleUploadDeviceCategory,
   currentPage,
   maxPages,
-  categories
+  categories,
+  dialogCategories,
 }) => {
   return (
     <div>
@@ -310,6 +316,7 @@ const GradePricingSheetSub = ({
                 name=""
                 id=""
                 className="bg-primary text-white rounded-lg outline-none px-2 py-1"
+                value={dialogCategories}
                 onChange={handleUploadDeviceCategory}
               >
                 {categories.map((cat) => (
@@ -363,6 +370,7 @@ const GradePricingSheetSub = ({
             name=""
             id=""
             className="bg-primary text-white rounded-lg outline-none px-2 py-1"
+            value={deviceCategory}
             onChange={handleDeviceCategory}
           >
             {categories.map((cat) => (
