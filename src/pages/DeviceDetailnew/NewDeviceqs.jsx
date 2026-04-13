@@ -18,10 +18,10 @@ const GROUPS = [
   'Core',
   'Cosmetics',
   'Display',
-  'Accessories',
   'Functional',
   'Functional_major',
   'Functional_minor',
+  'Accessories',
   'Warranty',
 ]
 
